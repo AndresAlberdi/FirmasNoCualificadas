@@ -1,0 +1,5 @@
+# terraform init -backend-config=backend.hcl
+bucket         = "pscnc-tfstate-000000000000"
+region         = "us-east-1"
+dynamodb_table = "pscnc-tfstate-lock"
+kms_key_id     = "arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000"

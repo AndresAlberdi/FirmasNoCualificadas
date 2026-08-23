@@ -1,0 +1,55 @@
+name: CI · Backend
+
+on:
+  push:
+    branches: [main, develop]
+    paths: ["services/**", ".github/workflows/ci-services.yml"]
+  pull_request:
+    paths: ["services/**", ".github/workflows/ci-services.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-services-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  calidad:
+    name: Lint, tipos y pruebas
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/pyproject.toml
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Formato y lint (ruff)
+        run: |
+          ruff check src tests
+          ruff format --check src tests
+
+      - name: Tipado estático (mypy)
+        run: mypy src
+
+      - name: Pruebas
+        run: pytest -q --cov=pscnc --cov-report=term-missing --cov-fail-under=70
+
+      - name: Verificar que no se versionó material criptográfico
+        run: |
+          if git ls-files | grep -Ei '\.(pem|key|p12|pfx|jks)$'; then
+            echo "::error::Se detectó material criptográfico versionado"
+            exit 1
+          fi

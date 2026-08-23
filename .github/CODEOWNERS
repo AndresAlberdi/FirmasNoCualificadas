@@ -1,0 +1,11 @@
+# Propiedad del código. Las rutas criptográficas y de evidencia exigen doble revisión.
+
+*                                               @segurolotengopy
+
+/services/src/pscnc/crypto/                     @segurolotengopy
+/services/src/pscnc/evidence/                   @segurolotengopy
+/infra/terraform/modules/kms-intermediate-ca/   @segurolotengopy
+/infra/terraform/modules/evidence-vault-s3/     @segurolotengopy
+/docs/adr/                                      @segurolotengopy
+/docs/CUMPLIMIENTO-MIC.md                       @segurolotengopy
+/SECURITY.md                                    @segurolotengopy

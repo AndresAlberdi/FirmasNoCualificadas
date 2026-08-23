@@ -1,0 +1,50 @@
+###############################################################################
+# Copie este archivo a terraform.tfvars y complete con los valores reales.
+# terraform.tfvars está excluido del control de versiones por .gitignore.
+###############################################################################
+
+region      = "us-east-1"
+aws_profile = "pscnc-dev"
+
+# --- Red existente -----------------------------------------------------------
+vpc_id                   = "vpc-0000000000000000"
+private_subnet_ids       = ["subnet-0000000000000000", "subnet-1111111111111111"]
+vpc_cidr_blocks          = ["10.0.0.0/16"]
+internal_certificate_arn = "arn:aws:acm:us-east-1:000000000000:certificate/00000000-0000-0000-0000-000000000000"
+
+# --- Roles de SecOps ---------------------------------------------------------
+secops_admin_role_arns = [
+  "arn:aws:iam::000000000000:role/SecOps-KMS-Admin-Role",
+  "arn:aws:iam::000000000000:role/Emergency-BreakGlass-Admin-Role",
+]
+
+# --- Nombres globales de buckets (deben ser únicos en todo AWS) --------------
+signed_bucket_name   = "pscnc-py-signed-vault-dev"
+evidence_bucket_name = "pscnc-py-evidence-trail-dev"
+trail_bucket_name    = "pscnc-py-cloudtrail-dev"
+crl_bucket_name      = "pscnc-py-crl-dev"
+
+# ADVERTENCIA: en el bucket de evidencias la retención es irreversible (modo
+# COMPLIANCE). Verifique este valor antes del primer apply.
+object_lock_retention_days = 1095
+
+# --- Aplicación --------------------------------------------------------------
+container_image = "000000000000.dkr.ecr.us-east-1.amazonaws.com/pscnc/signer:dev"
+
+secret_arns = [
+  "arn:aws:secretsmanager:us-east-1:000000000000:secret:pscnc/b2b/hmac-??????",
+  "arn:aws:secretsmanager:us-east-1:000000000000:secret:pscnc/tsa/credentials-??????",
+]
+
+container_secrets = [
+  { name = "PSCNC_TSA_PASSWORD", value_from = "arn:aws:secretsmanager:us-east-1:000000000000:secret:pscnc/tsa/credentials-??????:password::" },
+]
+
+# --- Panel B2B ---------------------------------------------------------------
+allowed_cors_origins    = ["https://panel-dev.example.com.py"]
+dashboard_callback_urls = ["https://panel-dev.example.com.py/auth/callback"]
+dashboard_logout_urls   = ["https://panel-dev.example.com.py/"]
+
+# --- Observabilidad ----------------------------------------------------------
+secops_email_endpoints = ["secops@example.com.py"]
+enable_guardduty       = true

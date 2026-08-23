@@ -1,0 +1,332 @@
+"""Emisión de certificados X.509 v3 efímeros para el firmante (ADR-0004).
+
+Flujo por transacción:
+
+1. Se genera un par de claves RSA-2048 en memoria del contenedor.
+2. Se construye el ``TBSCertificate`` con el perfil exigido por la Resolución MIC
+   N.º 262/2024 (`DOC-ICPP-20 v2.0`).
+3. Se calcula su digest SHA-256 y se firma con la CA intermedia residente en KMS.
+4. Tras producir el bloque CMS, la clave privada se descarta.
+
+La construcción se realiza con ``asn1crypto`` y no con ``cryptography`` porque la
+firma es externa: ``x509.CertificateBuilder.sign()`` exige un objeto de clave
+privada local, que aquí no existe por diseño.
+"""
+
+from __future__ import annotations
+
+import secrets
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+
+from asn1crypto import algos, keys, x509
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+from pscnc.crypto.ca_signer import ALGORITMOS_SOPORTADOS, CaSigner, sha256_digest
+from pscnc.errors import SigningError
+from pscnc.logging_setup import get_logger
+
+logger = get_logger(__name__)
+
+# OID de firma de documentos (Microsoft Document Signing), reconocido por los
+# lectores de PDF más difundidos.
+OID_DOCUMENT_SIGNING = "1.3.6.1.4.1.311.10.3.12"
+
+TAMANIO_CLAVE_FIRMANTE = 2048
+
+
+@dataclass(frozen=True, slots=True)
+class SubjectData:
+    """Datos del firmante que se vuelcan al sujeto del certificado."""
+
+    common_name: str
+    national_id: str
+    country: str = "PY"
+    transaction_id: str = ""
+    email: str | None = None
+
+    @property
+    def serial_number(self) -> str:
+        return f"PY-{self.national_id}"
+
+
+@dataclass(frozen=True, slots=True)
+class IssuedCertificate:
+    """Certificado efímero emitido junto con su clave privada en memoria."""
+
+    certificate: x509.Certificate
+    private_key_info: keys.PrivateKeyInfo
+    private_key_pem: bytes
+    serial_number: str
+
+    @property
+    def certificate_der(self) -> bytes:
+        return self.certificate.dump()
+
+    @property
+    def certificate_pem(self) -> str:
+        import base64
+
+        cuerpo = base64.b64encode(self.certificate_der).decode("ascii")
+        lineas = [cuerpo[i : i + 64] for i in range(0, len(cuerpo), 64)]
+        return "-----BEGIN CERTIFICATE-----\n" + "\n".join(lineas) + "\n-----END CERTIFICATE-----\n"
+
+
+class EphemeralCertificateAuthority:
+    """Emisor de certificados de firmante de un solo uso."""
+
+    def __init__(
+        self,
+        *,
+        ca_certificate_der: bytes,
+        ca_signer: CaSigner,
+        crl_url: str,
+        policy_oid: str | None = None,
+        backdate_minutes: int = 5,
+        validity_minutes: int = 15,
+    ) -> None:
+        self._ca_cert = x509.Certificate.load(ca_certificate_der)
+        self._ca_signer = ca_signer
+        self._crl_url = crl_url
+        self._policy_oid = policy_oid or None
+        self._backdate = timedelta(minutes=backdate_minutes)
+        self._validity = timedelta(minutes=validity_minutes)
+
+        if self._ca_cert.ca is False:
+            raise SigningError(
+                "El certificado configurado como CA intermedia no tiene basicConstraints CA:TRUE"
+            )
+
+    # ------------------------------------------------------------------ API --
+    @property
+    def ca_certificate(self) -> x509.Certificate:
+        return self._ca_cert
+
+    @property
+    def ca_serial_number(self) -> str:
+        return str(self._ca_cert.serial_number)
+
+    def issue(self, subject: SubjectData, *, now: datetime | None = None) -> IssuedCertificate:
+        """Emite un certificado efímero para el firmante indicado."""
+        instante = now or datetime.now(UTC)
+        clave_privada = rsa.generate_private_key(
+            public_exponent=65537, key_size=TAMANIO_CLAVE_FIRMANTE
+        )
+
+        spki_der = clave_privada.public_key().public_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        public_key_info = keys.PublicKeyInfo.load(spki_der)
+
+        serial = secrets.randbits(159) + 1  # positivo y < 20 octetos, conforme a RFC 5280
+        tbs = self._build_tbs(subject, public_key_info, serial, instante)
+
+        firma = self._ca_signer.sign_digest(sha256_digest(tbs.dump()))
+        certificado = x509.Certificate(
+            {
+                "tbs_certificate": tbs,
+                "signature_algorithm": self._signature_algorithm(),
+                "signature_value": firma,
+            }
+        )
+
+        pkcs8_der = clave_privada.private_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        pem = clave_privada.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+
+        logger.info(
+            "ephemeral_certificate_issued",
+            serial_number=format(serial, "x"),
+            transaction_id=subject.transaction_id,
+            validity_minutes=int(self._validity.total_seconds() // 60),
+        )
+
+        return IssuedCertificate(
+            certificate=certificado,
+            private_key_info=keys.PrivateKeyInfo.load(pkcs8_der),
+            private_key_pem=pem,
+            serial_number=format(serial, "x"),
+        )
+
+    # -------------------------------------------------------------- Interno --
+    def _signature_algorithm(self) -> algos.SignedDigestAlgorithm:
+        nombre = ALGORITMOS_SOPORTADOS[self._ca_signer.signing_algorithm]
+        if nombre == "rsassa_pss":
+            return algos.SignedDigestAlgorithm(
+                {
+                    "algorithm": "rsassa_pss",
+                    "parameters": algos.RSASSAPSSParams(
+                        {
+                            "hash_algorithm": algos.DigestAlgorithm({"algorithm": "sha256"}),
+                            "mask_gen_algorithm": algos.MaskGenAlgorithm(
+                                {
+                                    "algorithm": "mgf1",
+                                    "parameters": algos.DigestAlgorithm({"algorithm": "sha256"}),
+                                }
+                            ),
+                            "salt_length": 32,
+                            "trailer_field": "trailer_field_bc",
+                        }
+                    ),
+                }
+            )
+        return algos.SignedDigestAlgorithm({"algorithm": nombre})
+
+    def _build_tbs(
+        self,
+        subject: SubjectData,
+        public_key_info: keys.PublicKeyInfo,
+        serial: int,
+        instante: datetime,
+    ) -> x509.TbsCertificate:
+        not_before = instante - self._backdate
+        not_after = instante + self._validity
+
+        nombre_sujeto = x509.Name.build(
+            {
+                "country_name": subject.country,
+                "common_name": subject.common_name,
+                "serial_number": subject.serial_number,
+                "organizational_unit_name": (
+                    f"Firma Electronica No Cualificada - TX {subject.transaction_id}"
+                    if subject.transaction_id
+                    else "Firma Electronica No Cualificada"
+                ),
+            }
+        )
+
+        return x509.TbsCertificate(
+            {
+                "version": "v3",
+                "serial_number": serial,
+                "signature": self._signature_algorithm(),
+                "issuer": self._ca_cert.subject,
+                "validity": x509.Validity(
+                    {
+                        "not_before": x509.Time({"utc_time": not_before}),
+                        "not_after": x509.Time({"utc_time": not_after}),
+                    }
+                ),
+                "subject": nombre_sujeto,
+                "subject_public_key_info": public_key_info,
+                "extensions": self._build_extensions(subject, public_key_info),
+            }
+        )
+
+    def _build_extensions(
+        self, subject: SubjectData, public_key_info: keys.PublicKeyInfo
+    ) -> list[x509.Extension]:
+        extensiones: list[x509.Extension] = [
+            x509.Extension(
+                {
+                    "extn_id": "basic_constraints",
+                    "critical": True,
+                    "extn_value": x509.BasicConstraints({"ca": False}),
+                }
+            ),
+            x509.Extension(
+                {
+                    "extn_id": "key_usage",
+                    "critical": True,
+                    # No repudio: el certificado solo sirve para firmar, nunca para cifrar.
+                    "extn_value": x509.KeyUsage({"digital_signature", "non_repudiation"}),
+                }
+            ),
+            x509.Extension(
+                {
+                    "extn_id": "extended_key_usage",
+                    "critical": False,
+                    "extn_value": x509.ExtKeyUsageSyntax(
+                        ["email_protection", OID_DOCUMENT_SIGNING]
+                    ),
+                }
+            ),
+            x509.Extension(
+                {
+                    "extn_id": "key_identifier",
+                    "critical": False,
+                    "extn_value": public_key_info.sha1,
+                }
+            ),
+            x509.Extension(
+                {
+                    "extn_id": "authority_key_identifier",
+                    "critical": False,
+                    "extn_value": x509.AuthorityKeyIdentifier(
+                        {"key_identifier": self._ca_key_identifier()}
+                    ),
+                }
+            ),
+        ]
+
+        if self._crl_url:
+            extensiones.append(
+                x509.Extension(
+                    {
+                        "extn_id": "crl_distribution_points",
+                        "critical": False,
+                        "extn_value": x509.CRLDistributionPoints(
+                            [
+                                x509.DistributionPoint(
+                                    {
+                                        "distribution_point": x509.DistributionPointName(
+                                            name="full_name",
+                                            value=x509.GeneralNames(
+                                                [
+                                                    x509.GeneralName(
+                                                        name="uniform_resource_identifier",
+                                                        value=self._crl_url,
+                                                    )
+                                                ]
+                                            ),
+                                        )
+                                    }
+                                )
+                            ]
+                        ),
+                    }
+                )
+            )
+
+        if self._policy_oid:
+            extensiones.append(
+                x509.Extension(
+                    {
+                        "extn_id": "certificate_policies",
+                        "critical": False,
+                        "extn_value": x509.CertificatePolicies(
+                            [x509.PolicyInformation({"policy_identifier": self._policy_oid})]
+                        ),
+                    }
+                )
+            )
+
+        if subject.email:
+            extensiones.append(
+                x509.Extension(
+                    {
+                        "extn_id": "subject_alt_name",
+                        "critical": False,
+                        "extn_value": x509.GeneralNames(
+                            [x509.GeneralName(name="rfc822_name", value=subject.email)]
+                        ),
+                    }
+                )
+            )
+
+        return extensiones
+
+    def _ca_key_identifier(self) -> bytes:
+        identificador = self._ca_cert.key_identifier
+        if identificador:
+            return bytes(identificador)
+        return bytes(self._ca_cert.public_key.sha1)

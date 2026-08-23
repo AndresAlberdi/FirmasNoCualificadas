@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+dashboard/dist/
+.vite/
+*.tsbuildinfo
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+!*.tfvars.example
+.terraform.tfstate.lock.info
+tfplan
+tfplan.*
+
+# Secretos y material criptográfico — NUNCA versionar
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.crt
+!docs/**/*.crt
+secrets/
+
+# Artefactos de prueba con datos personales
+tmp/
+sandbox-out/
+*.signed.pdf
+evidence-*.pdf
+
+# Sistema
+.DS_Store
+.idea/
+.vscode/
