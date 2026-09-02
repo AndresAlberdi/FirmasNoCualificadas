@@ -139,6 +139,49 @@ def test_health_no_revela_configuracion_sensible(cliente) -> None:  # type: igno
     assert "kms" not in str(cuerpo).lower() or cuerpo["crypto_backend"] in ("kms", "local")
 
 
+class TestClavesPublicas:
+    """El endpoint que hace verificable el acta sin acceso a nuestros sistemas."""
+
+    @pytest.fixture()
+    def con_inquilinos(self, monkeypatch: pytest.MonkeyPatch) -> list[dict[str, str]]:
+        claves = [
+            {
+                "kty": "EC",
+                "crv": "P-256",
+                "alg": "ES256",
+                "use": "sig",
+                "kid": f"alias/fnc/dev/{CLIENTE}/acta-seal/v1",
+                "x": "x" * 43,
+                "y": "y" * 43,
+            }
+        ]
+        monkeypatch.setattr(modulo_app, "build_signing_service", lambda: ServicioFalso())
+        import pscnc.evidence.claves_publicas as publicas
+        import pscnc.orchestrator.dependencies as dependencias
+
+        monkeypatch.setattr(dependencias, "build_tenant_key_rings", lambda: [])
+        monkeypatch.setattr(publicas, "construir_jwks", lambda _: {"keys": claves})
+        return claves
+
+    def test_se_sirve_sin_autenticacion(self, cliente, con_inquilinos) -> None:  # type: ignore[no-untyped-def]
+        """Exigir credenciales aquí anularía el propósito del endpoint."""
+        respuesta = cliente.get("/.well-known/fnc-keys.json")
+
+        assert respuesta.status_code == 200
+        assert respuesta.json()["keys"][0]["alg"] == "ES256"
+
+    def test_declara_una_cache_corta(self, cliente, con_inquilinos) -> None:  # type: ignore[no-untyped-def]
+        """Evita golpear a KMS en cada verificación sin demorar una rotación."""
+        respuesta = cliente.get("/.well-known/fnc-keys.json")
+
+        assert "max-age=300" in respuesta.headers["cache-control"]
+
+    def test_no_expone_material_privado(self, cliente, con_inquilinos) -> None:  # type: ignore[no-untyped-def]
+        cuerpo = cliente.get("/.well-known/fnc-keys.json").text
+
+        assert '"d"' not in cuerpo
+
+
 # ---------------------------------------------------------- Autenticación ----
 def test_rechaza_peticion_sin_firma(cliente, servicio) -> None:  # type: ignore[no-untyped-def]
     respuesta = cliente.get(f"/v1/signing-sessions/{TX}/evidence")

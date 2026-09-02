@@ -15,6 +15,7 @@ from pscnc.config import Settings, get_settings
 from pscnc.crypto.ca_signer import CaSigner, KmsCaSigner, LocalCaSigner
 from pscnc.crypto.ephemeral_ca import EphemeralCertificateAuthority
 from pscnc.crypto.pades import PadesSigner, build_timestamper_factory
+from pscnc.crypto.tenant_keys import TenantKeyError, TenantKeyRing
 from pscnc.logging_setup import get_logger
 from pscnc.onboarding.client import (
     HttpOnboardingClient,
@@ -118,6 +119,29 @@ def build_signing_service() -> SigningService:
         presigned_ttl=settings.presigned_url_ttl,
         jurisdiction=settings.jurisdiction,
     )
+
+
+def build_tenant_key_ring(tenant_id: str, settings: Settings | None = None) -> TenantKeyRing:
+    """Construye el llavero de un inquilino declarado en la configuración.
+
+    Se comprueba que el inquilino esté declarado: sin eso, un identificador
+    llegado en una petición construiría un alias arbitrario y las llamadas a KMS
+    fallarían con un error de clave inexistente, que no dice nada sobre la causa.
+    """
+    ajustes = settings or get_settings()
+    if tenant_id not in ajustes.tenant_ids:
+        raise TenantKeyError(f"El inquilino {tenant_id!r} no está declarado en este despliegue.")
+    return TenantKeyRing(
+        tenant_id,
+        environment=ajustes.environment,
+        region=ajustes.aws_region,
+    )
+
+
+def build_tenant_key_rings(settings: Settings | None = None) -> list[TenantKeyRing]:
+    """Llaveros de todos los inquilinos declarados, para publicar sus claves."""
+    ajustes = settings or get_settings()
+    return [build_tenant_key_ring(tenant, ajustes) for tenant in ajustes.tenant_ids]
 
 
 @lru_cache(maxsize=1)

@@ -1041,6 +1041,19 @@ wheels = [
 ]
 
 [[package]]
+name = "jwcrypto"
+version = "1.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2a/f6/e5bede9abf478b463100b089bf0631fe84542e3e43418f1e99dd16928b95/jwcrypto-1.6.0.tar.gz", hash = "sha256:02a82b0a3a36b2553309d78c65e1c0e3350b640fe4091f53f66f582b11f49378", size = 116186, upload-time = "2026-09-01T13:09:45.153Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/48/c2/e97fbec034d597c829cb915c227135b87dbff3ee5a9570664d23e1fa7db8/jwcrypto-1.6.0-py3-none-any.whl", hash = "sha256:09ece277d48620079c90af7dfe84be085a229c1cbe06baa295de41e5019ac998", size = 121184, upload-time = "2026-09-01T13:09:43.911Z" },
+]
+
+[[package]]
 name = "librt"
 version = "0.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1898,6 +1911,7 @@ dependencies = [
     { name = "python-multipart" },
     { name = "reportlab" },
     { name = "requests" },
+    { name = "rfc8785" },
     { name = "structlog" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -1907,6 +1921,7 @@ dev = [
     { name = "bandit" },
     { name = "boto3-stubs", extra = ["dynamodb", "kms", "s3", "secretsmanager"] },
     { name = "httpx2" },
+    { name = "jwcrypto" },
     { name = "moto", extra = ["dynamodb", "s3"] },
     { name = "mypy" },
     { name = "pytest" },
@@ -1926,6 +1941,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=43.0" },
     { name = "fastapi", specifier = ">=0.115,<1.0" },
     { name = "httpx2", marker = "extra == 'dev'", specifier = ">=2.0" },
+    { name = "jwcrypto", marker = "extra == 'dev'", specifier = ">=1.5" },
     { name = "moto", extras = ["dynamodb", "s3", "kms"], marker = "extra == 'dev'", specifier = ">=5.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13" },
     { name = "pydantic", specifier = ">=2.9,<3.0" },
@@ -1939,6 +1955,7 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.12" },
     { name = "reportlab", specifier = ">=4.2,<5.0" },
     { name = "requests", specifier = ">=2.32,<3.0" },
+    { name = "rfc8785", specifier = ">=0.1,<1.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.7" },
     { name = "structlog", specifier = ">=24.4,<25.0" },
     { name = "types-requests", marker = "extra == 'dev'" },
@@ -2377,6 +2394,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9f/47/f216a33221db8eff328987661cf18371afee89c62a62b434b963d6b509c9/responses-0.26.3.tar.gz", hash = "sha256:b0c11ca8131b8b227b8d5108e6ed39772222bd5aab030ed430e8f99057c4c409", size = 86335, upload-time = "2026-08-26T19:17:24.373Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6d/86/ca7958de70cb0752350575e98229368a3a2f746a2942034b3364e17312bb/responses-0.26.3-py3-none-any.whl", hash = "sha256:74474f799334ac4f37d93b6437ecc3bb1bb5c77a8d31780a338643be2dce0af8", size = 36289, upload-time = "2026-08-26T19:17:23.176Z" },
+]
+
+[[package]]
+name = "rfc8785"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ef/2f/fa1d2e740c490191b572d33dbca5daa180cb423c24396b856f5886371d8b/rfc8785-0.1.4.tar.gz", hash = "sha256:e545841329fe0eee4f6a3b44e7034343100c12b4ec566dc06ca9735681deb4da", size = 14321, upload-time = "2024-09-27T16:33:31.206Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4d/78/119878110660b2ad709888c8a1614fce7e2fab39080ab960656dc8605bf6/rfc8785-0.1.4-py3-none-any.whl", hash = "sha256:520d690b448ecf0703691c76e1a34a24ddcd4fc5bc41d589cb7c58ec651bcd48", size = 9240, upload-time = "2024-09-27T16:33:29.683Z" },
 ]
 
 [[package]]

@@ -172,6 +172,34 @@ EntornoDep = Annotated[RequestEnvironment, Depends(entorno_de_peticion)]
 
 
 # ------------------------------------------------------------------- Rutas ---
+@app.get("/.well-known/fnc-keys.json", tags=["verificación"])
+async def claves_publicas_de_sello() -> JSONResponse:
+    """Claves públicas con las que se verifica el sello de las actas (RFC 7517).
+
+    Es un endpoint **público y sin autenticación**, y tiene que serlo: el acta
+    sellada solo sirve como prueba si un tercero —el inquilino, su asesoría legal,
+    un perito— puede verificarla sin pedirnos acceso. Un sello que solo nosotros
+    sabemos comprobar no traslada confianza, la concentra.
+
+    Publica únicamente material público. La clave privada no puede salir del HSM
+    ni aunque quisiéramos (ADR-0006).
+    """
+    from pscnc.evidence.claves_publicas import construir_jwks
+    from pscnc.orchestrator.dependencies import build_tenant_key_rings
+
+    jwks = construir_jwks(build_tenant_key_rings())
+
+    return JSONResponse(
+        content=jwks,
+        headers={
+            # Las claves cambian solo al rotar, un procedimiento planificado. Una
+            # caché corta evita golpear a KMS en cada verificación sin que una
+            # rotación tarde en propagarse.
+            "Cache-Control": "public, max-age=300",
+        },
+    )
+
+
 @app.get("/health", response_model=HealthResponse, tags=["operación"])
 async def health() -> HealthResponse:
     settings = get_settings()
