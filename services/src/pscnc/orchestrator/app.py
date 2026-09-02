@@ -39,6 +39,14 @@ logger = get_logger(__name__)
 
 TAMANIO_MAXIMO_PDF = 25 * 1024 * 1024  # 25 MiB
 
+# Marcador para el caso en que no se pueda determinar la dirección del cliente.
+# Deliberadamente NO es una dirección válida: escribir "0.0.0.0" en una evidencia
+# pericial afirma algo falso —un perito no puede distinguir la dirección real de
+# la ausencia de dato— y este campo se conserva como prueba del origen del acto.
+# En producción el servicio corre detrás de un balanceador que siempre envía
+# `X-Forwarded-For`, así que este valor señala una anomalía de despliegue.
+IP_NO_CAPTURADA = "no-capturada"
+
 app = FastAPI(
     title="PSCNC · API de Firma Electrónica No Cualificada",
     version=__version__,
@@ -87,9 +95,7 @@ def entorno_de_peticion(request: Request) -> RequestEnvironment:
     ip = (
         forwarded.split(",")[0].strip()
         if forwarded
-        else (
-            request.client.host if request.client else "0.0.0.0"  # noqa: S104
-        )
+        else (request.client.host if request.client else IP_NO_CAPTURADA)
     )
     puerto = request.client.port if request.client else 0
     return RequestEnvironment(

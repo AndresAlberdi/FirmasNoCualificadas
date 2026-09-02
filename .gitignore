@@ -12,11 +12,13 @@ build/
 .coverage
 htmlcov/
 
-# Node
+# Node — `pnpm-lock.yaml` SÍ se versiona (es la reproducibilidad de la build)
 node_modules/
 dashboard/dist/
 .vite/
 *.tsbuildinfo
+package-lock.json
+yarn.lock
 
 # Terraform
 .terraform/

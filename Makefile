@@ -1,8 +1,13 @@
 SHELL := /bin/bash
 ENV ?= dev
 PY  := services/.venv/bin/python
-PIP := services/.venv/bin/pip
 TF_DIR := infra/terraform/envs/$(ENV)
+
+# Gestión de paquetes (ver `docs/adr/0009-contrato-de-compatibilidad-con-tenants.md`
+# y CLAUDE.md): `uv` para Python con `uv.lock` versionado, y `pnpm` vía Corepack
+# con `ignore-scripts=true` para todo lo que sea Node. No se usa `npm install`.
+UV   := uv
+PNPM := COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm
 
 .DEFAULT_GOAL := help
 
@@ -13,10 +18,9 @@ help: ## Muestra esta ayuda
 # ---------------------------------------------------------------- Backend ----
 .PHONY: setup
 setup: ## Crea el entorno virtual e instala dependencias de backend y dashboard
-	python3 -m venv services/.venv
-	$(PIP) install --upgrade pip
-	$(PIP) install -e "services[dev]"
-	cd dashboard && npm install
+	cd services && $(UV) venv --python 3.12
+	cd services && $(UV) sync --extra dev
+	cd dashboard && $(PNPM) install --frozen-lockfile
 
 .PHONY: test
 test: lint ## Ejecuta la batería de pruebas del backend
@@ -24,9 +28,13 @@ test: lint ## Ejecuta la batería de pruebas del backend
 
 .PHONY: lint
 lint: ## Análisis estático (ruff + mypy)
-	services/.venv/bin/ruff check services/src services/tests
-	services/.venv/bin/ruff format --check services/src services/tests
-	services/.venv/bin/mypy services/src
+	# Se ejecuta DENTRO de `services/`: es donde vive el `pyproject.toml` con la
+	# configuración de ambas herramientas. Corriéndolo desde la raíz, mypy no
+	# carga el plugin de Pydantic y reporta errores que la configuración real no
+	# tiene — un falso positivo que además oculta los verdaderos.
+	cd services && .venv/bin/ruff check src tests
+	cd services && .venv/bin/ruff format --check src tests
+	cd services && .venv/bin/mypy src
 
 .PHONY: run-api
 run-api: ## Levanta la API B2B en modo desarrollo
@@ -39,11 +47,16 @@ docker-build: ## Construye la imagen del servicio de firma
 # -------------------------------------------------------------- Dashboard ----
 .PHONY: run-dashboard
 run-dashboard: ## Levanta el dashboard B2B
-	cd dashboard && npm run dev
+	cd dashboard && $(PNPM) run dev
 
 .PHONY: build-dashboard
 build-dashboard: ## Compila el dashboard para producción
-	cd dashboard && npm run build
+	cd dashboard && $(PNPM) run build
+
+.PHONY: lint-dashboard
+lint-dashboard: ## ESLint y verificación de tipos del dashboard
+	cd dashboard && $(PNPM) run lint
+	cd dashboard && $(PNPM) run typecheck
 
 # -------------------------------------------------------------- Terraform ----
 .PHONY: tf-init tf-plan tf-apply tf-fmt tf-validate
@@ -65,5 +78,5 @@ tf-validate: ## Valida la sintaxis de todos los entornos
 # ------------------------------------------------------------- Seguridad -----
 .PHONY: security
 security: ## Escaneos de seguridad locales
-	services/.venv/bin/bandit -q -r services/src
+	cd services && .venv/bin/bandit -q -c pyproject.toml -r src
 	@command -v checkov >/dev/null && checkov -d infra/terraform --quiet || echo "checkov no instalado, omitido"

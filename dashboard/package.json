@@ -2,6 +2,7 @@
   "name": "pscnc-dashboard",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "pnpm@9.15.9",
   "type": "module",
   "description": "Panel B2B y Folleto Forense del PSCNC (Paraguay)",
   "scripts": {
