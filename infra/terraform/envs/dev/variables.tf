@@ -128,3 +128,66 @@ variable "enable_guardduty" {
   type        = bool
   default     = true
 }
+
+# ---------------------------------------------------------- Jurisdicción -----
+# Estas variables NO se editan a mano: las genera
+# `scripts/exportar-jurisdiccion.py` en `jurisdiccion.auto.tfvars` a partir del
+# perfil de `services/src/jurisdictions/` (ADR-0008). Duplicar acá el plazo de
+# conservación sería tener dos fuentes de verdad para un dato con consecuencia
+# legal: si divergieran, la infraestructura conservaría la evidencia menos tiempo
+# del que la constancia le promete al firmante.
+
+variable "jurisdiction_code" {
+  description = "Código ISO de la jurisdicción activa. Generado desde el perfil."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[A-Z]{2}$", var.jurisdiction_code))
+    error_message = "El código de jurisdicción debe ser ISO 3166-1 alfa-2 en mayúsculas."
+  }
+}
+
+variable "jurisdiction_name" {
+  description = "Nombre de la jurisdicción, para etiquetas y mensajes de error."
+  type        = string
+}
+
+variable "jurisdiction_minimum_retention_days" {
+  description = "Conservación mínima de evidencia que exige la jurisdicción."
+  type        = number
+}
+
+variable "jurisdiction_retention_legal_basis" {
+  description = "Norma que fundamenta el plazo de conservación."
+  type        = string
+}
+
+variable "jurisdiction_incident_notification_hours" {
+  description = "Plazo máximo para notificar un incidente al regulador."
+  type        = number
+}
+
+variable "jurisdiction_legally_validated" {
+  description = "Si el perfil pasó revisión de asesoría legal local."
+  type        = bool
+}
+
+# ------------------------------------------------------------- Inquilinos ----
+variable "tenants" {
+  description = <<-EOT
+    Inquilinos con claves propias de sello de acta y de cifrado de evidencias
+    (ADR-0006). Dar de alta un inquilino es una operación de infraestructura, no
+    un registro en una tabla: crea claves, alias y políticas.
+  EOT
+  type = map(object({
+    acta_seal_key_version = optional(number, 1)
+    evidence_key_version  = optional(number, 1)
+  }))
+  default = {}
+}
+
+variable "break_glass_role_arns" {
+  description = "Roles autorizados a programar la eliminación de una clave (procedimiento de emergencia)."
+  type        = list(string)
+  default     = []
+}

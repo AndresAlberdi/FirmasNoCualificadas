@@ -28,6 +28,9 @@ yarn.lock
 crash.log
 *.tfvars
 !*.tfvars.example
+# Generado desde el perfil de jurisdicción: no tiene secretos y su historial es
+# evidencia de control de cambios sobre un dato con consecuencia legal (ADR-0002).
+!jurisdiccion.auto.tfvars
 .terraform.tfstate.lock.info
 tfplan
 tfplan.*
@@ -66,6 +69,11 @@ serviceAccountKey*.json
 tfplan*
 *.tfstate*
 *.auto.tfvars
+# Excepción: lo genera scripts/exportar-jurisdiccion.py desde el perfil de la
+# jurisdicción. No contiene secretos —son datos normativos públicos— y su
+# historial es evidencia de control de cambios sobre un dato con consecuencia
+# legal (ADR-0002).
+!jurisdiccion.auto.tfvars
 secrets.tfvars
 .trivy-cache/
 .trivyignore.yaml
