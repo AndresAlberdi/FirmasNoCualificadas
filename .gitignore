@@ -10,6 +10,7 @@ venv/
 dist/
 build/
 .coverage
+coverage/
 htmlcov/
 
 # Node — `pnpm-lock.yaml` SÍ se versiona (es la reproducibilidad de la build)

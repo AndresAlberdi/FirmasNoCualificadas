@@ -90,6 +90,7 @@ export type AccionAuditada =
   | 'REVEAL_PII'
   | 'DOWNLOAD_SIGNED_PDF'
   | 'DOWNLOAD_EVIDENCE_PDF'
+  | 'VERIFY_ACTA'
 
 export interface EventoAuditoriaPanel {
   action: AccionAuditada

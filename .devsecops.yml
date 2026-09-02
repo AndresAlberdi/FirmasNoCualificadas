@@ -29,14 +29,16 @@ componentes:
     proveedor: ninguno
     ambientes: {}
 
-  # Panel B2B. Hoy es un prototipo que se alimenta de datos simulados
-  # (`src/lib/mockData.ts`): no consume la API ni tiene suite de pruebas, así
-  # que se declara `static` y no `node`. Pasa a `node`, con sus pruebas y su
-  # umbral de cobertura, cuando la fase 8 lo convierta en producto
-  # (docs/PENDIENTES.md, T-06).
+  # Panel B2B. Pasa de `static` a `node` (cierra T-06): ya tiene suite propia
+  # —verificación del acta con WebCrypto, enmascarado de datos personales y
+  # registro de auditoría— y por lo tanto queda sujeto al umbral de cobertura.
+  # La medición cubre todo `src`, no solo lo que las pruebas importan: la
+  # configuración está en `vite.config.ts`, junto con lo que se excluye y por qué.
+  # Sigue alimentándose de datos sintéticos (`src/lib/mockData.ts`) mientras no
+  # consuma la API real.
   - nombre: dashboard
     ruta: ./dashboard
-    stack: static
+    stack: node
     proveedor: ninguno
     ambientes: {}
 

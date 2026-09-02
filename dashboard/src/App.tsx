@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { Lock, ScrollText, ShieldCheck } from 'lucide-react'
 import ForensicViewer from './components/ForensicViewer'
+import VerificacionPublica from './components/VerificacionPublica'
 import { transaccionDemo } from './lib/mockData'
 import type { AccionAuditada, EventoAuditoriaPanel } from './lib/types'
 
@@ -71,6 +72,8 @@ export default function App() {
 
         <ForensicViewer transaccion={transaccionDemo} onAuditar={auditar} />
 
+        <VerificacionPublica onAuditar={(detalle) => auditar('VERIFY_ACTA', detalle)} />
+
         <section className="tarjeta">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-100">
             <ScrollText className="h-4 w-4 text-institucional-500" aria-hidden />
@@ -81,7 +84,7 @@ export default function App() {
             inmutable con retención de dos años.
           </p>
 
-          <ul className="mt-4 divide-y divide-slate-800 text-xs">
+          <ul aria-label="Registro de auditoría del panel" className="mt-4 divide-y divide-slate-800 text-xs">
             {eventos.map((evento, indice) => (
               <li key={`${evento.at}-${indice}`} className="flex flex-wrap gap-2 py-2">
                 <span className="font-mono text-slate-500">
