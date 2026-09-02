@@ -15,6 +15,7 @@ from cryptography import x509 as cx509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 
+from jurisdictions import get_profile
 from pscnc.crypto.ephemeral_ca import EphemeralCertificateAuthority, SubjectData
 
 CRL_URL = "https://crl.pruebas.example.py/pscnc/intermediate.crl"
@@ -35,7 +36,8 @@ def autoridad(ca_certificate_der, ca_signer):  # type: ignore[no-untyped-def]
 
 @pytest.fixture()
 def sujeto() -> SubjectData:
-    return SubjectData(
+    return SubjectData.for_jurisdiction(
+        get_profile("PY"),
         common_name="Firmante De Prueba",
         national_id="4829153",
         transaction_id="9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",

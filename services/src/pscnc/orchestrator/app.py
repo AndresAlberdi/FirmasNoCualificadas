@@ -104,8 +104,9 @@ app = FastAPI(
     title="PSCNC · API de Firma Electrónica No Cualificada",
     version=__version__,
     description=(
-        "API B2B para la generación de firmas electrónicas no cualificadas en formato "
-        "PAdES-B-T conforme a la Ley N.º 6822/2021 de la República del Paraguay."
+        "API B2B para la generación de firmas electrónicas no cualificadas. El marco "
+        "normativo aplicable lo determina la jurisdicción de cada transacción "
+        "(ADR-0008)."
     ),
     docs_url="/docs",
     openapi_url="/openapi.json",

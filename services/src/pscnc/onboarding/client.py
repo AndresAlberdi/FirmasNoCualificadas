@@ -16,6 +16,7 @@ from typing import Any, Protocol
 
 import requests
 
+from jurisdictions import DEFAULT_JURISDICTION, get_profile
 from pscnc.errors import (
     ConsentVerificationError,
     OnboardingNotApprovedError,
@@ -110,15 +111,21 @@ class SandboxOnboardingClient:
 
     OTP_ACEPTADO = "000000"
 
-    def __init__(self, *, national_id: str = "4829153") -> None:
+    def __init__(
+        self, *, national_id: str = "4829153", jurisdiction: str = DEFAULT_JURISDICTION
+    ) -> None:
         self._national_id = national_id
+        # El tipo de documento no se cablea: se toma el primero que admite la
+        # jurisdicción, de modo que el cliente de pruebas siga siendo válido al
+        # cambiar de país.
+        self._document_type = get_profile(jurisdiction).document_types[0].code
 
     def fetch(self, onboarding_token: str) -> OnboardingSnapshot:
         return OnboardingSnapshot(
             onboarding_id=onboarding_token,
             approved=True,
             identity=IdentityEvidence(
-                document_type="CI_PY",
+                document_type=self._document_type,
                 national_id=self._national_id,
                 first_name="Firmante",
                 last_name="De Prueba",

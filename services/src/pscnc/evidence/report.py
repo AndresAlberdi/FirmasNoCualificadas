@@ -5,17 +5,21 @@ desconoce su firma. Está organizado según las cuatro preguntas que responde un
 pericia informática —quién, con qué voluntad, desde dónde y sobre qué documento—
 y cada afirmación se acompaña del dato técnico que la respalda.
 
-Pendiente declarado: el sellado del expediente con un **Sello Electrónico
-Cualificado de persona jurídica** requiere un certificado de sello contratado con
-un PCSC cualificado paraguayo. Mientras no exista, el expediente se entrega
-firmado con la CA intermedia del propio prestador, lo que aporta integridad pero
-no la autonomía probatoria del Art. 63 de la Ley N.º 6822/2021.
+Todo el texto normativo sale del perfil de la jurisdicción del expediente
+(ADR-0008): este módulo sabe cómo componer un expediente, no bajo qué ley.
+
+Pendiente declarado: el sellado del expediente con un **sello electrónico de
+persona jurídica** requiere un certificado contratado con un prestador cualificado
+de la jurisdicción. Mientras no exista, el expediente se entrega firmado con la CA
+intermedia del propio prestador, lo que aporta integridad pero no autonomía
+probatoria (B-01 de `docs/PENDIENTES.md`).
 """
 
 from __future__ import annotations
 
 import io
 from datetime import UTC, datetime
+from typing import Any
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_JUSTIFY
@@ -32,6 +36,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from jurisdictions import get_profile
 from pscnc.logging_setup import get_logger
 from pscnc.models.audit_trail import AuditTrailItem
 
@@ -114,22 +119,28 @@ def _fecha(valor: datetime | None) -> str:
     return valor.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
-def _pie(canvas: object, documento: object) -> None:
-    canvas.saveState()  # type: ignore[attr-defined]
-    canvas.setFont("Helvetica", 7)  # type: ignore[attr-defined]
-    canvas.setFillColor(colors.HexColor("#64748B"))  # type: ignore[attr-defined]
-    canvas.drawString(  # type: ignore[attr-defined]
-        20 * mm,
-        12 * mm,
-        "Expediente de evidencias — Prestador de Servicios de Confianza No Cualificado "
-        "(Ley N.º 6822/2021, Paraguay)",
-    )
-    canvas.drawRightString(190 * mm, 12 * mm, f"Página {documento.page}")  # type: ignore[attr-defined]
-    canvas.restoreState()  # type: ignore[attr-defined]
+def _pie_para(texto_pie: str) -> Any:
+    """Devuelve el dibujante del pie de página con el texto de la jurisdicción."""
+
+    def _pie(canvas: object, documento: object) -> None:
+        canvas.saveState()  # type: ignore[attr-defined]
+        canvas.setFont("Helvetica", 7)  # type: ignore[attr-defined]
+        canvas.setFillColor(colors.HexColor("#64748B"))  # type: ignore[attr-defined]
+        canvas.drawString(20 * mm, 12 * mm, texto_pie)  # type: ignore[attr-defined]
+        canvas.drawRightString(190 * mm, 12 * mm, f"Página {documento.page}")  # type: ignore[attr-defined]
+        canvas.restoreState()  # type: ignore[attr-defined]
+
+    return _pie
 
 
 def build_evidence_report(item: AuditTrailItem) -> bytes:
-    """Construye el expediente de evidencias en PDF a partir del ítem de auditoría."""
+    """Construye el expediente de evidencias en PDF a partir del ítem de auditoría.
+
+    Todo el texto normativo sale del perfil de la jurisdicción del expediente
+    (ADR-0008): el mismo generador produce un expediente paraguayo o boliviano sin
+    una sola rama condicional.
+    """
+    perfil = get_profile(item.jurisdiction)
     estilos = _estilos()
     buffer = io.BytesIO()
     documento = SimpleDocTemplate(
@@ -140,7 +151,7 @@ def build_evidence_report(item: AuditTrailItem) -> bytes:
         topMargin=18 * mm,
         bottomMargin=20 * mm,
         title=f"Expediente de evidencias {item.transaction_id}",
-        author="PSCNC Paraguay",
+        author=perfil.text("expediente.autor"),
         subject="Pista de auditoría de firma electrónica no cualificada",
     )
 
@@ -150,14 +161,8 @@ def build_evidence_report(item: AuditTrailItem) -> bytes:
     consentimiento = item.consent_evidence
 
     flujo: list[object] = [
-        Paragraph("Expediente de Evidencias Técnicas", estilos["titulo"]),
-        Paragraph(
-            "Documento generado automáticamente por la plataforma del Prestador de Servicios "
-            "de Confianza No Cualificado. Contiene la pista de auditoría de una firma "
-            "electrónica no cualificada conforme a la Ley N.º 6822/2021 y su Decreto "
-            "Reglamentario N.º 7576/2022.",
-            estilos["subtitulo"],
-        ),
+        Paragraph(perfil.text("expediente.titulo"), estilos["titulo"]),
+        Paragraph(perfil.text("expediente.introduccion"), estilos["subtitulo"]),
         _tabla(
             [
                 ("Identificador de transacción", item.transaction_id),
@@ -313,18 +318,21 @@ def build_evidence_report(item: AuditTrailItem) -> bytes:
         Paragraph("5. Alcance y limitaciones de este expediente", estilos["seccion"]),
         Paragraph(
             "Este expediente acredita el proceso técnico ejecutado por el prestador. La firma "
-            "documentada es una <b>firma electrónica no cualificada</b>: goza de validez "
-            "jurídica por el principio de no discriminación (Art. 39 de la Ley N.º 6822/2021), "
-            "pero no de la presunción legal de autoría propia de la firma cualificada. Su "
-            "eficacia probatoria se apoya en los elementos aquí documentados, sujetos a la "
-            "valoración del juzgador y, en su caso, a pericia informática. "
-            "El prestador conserva estos registros por el plazo mínimo exigido por la "
-            "normativa vigente, en almacenamiento inmutable de tipo WORM.",
+            "documentada es una <b>firma electrónica no cualificada</b>: no goza de la "
+            "presunción legal de autoría propia de la firma cualificada, y su eficacia "
+            "probatoria se apoya en los elementos aquí documentados, sujetos a la valoración "
+            "del juzgador y, en su caso, a pericia informática. "
+            f"{perfil.text('expediente.valor_probatorio')} "
+            f"El prestador conserva estos registros durante un mínimo de "
+            f"{perfil.retention.minimum_days} días contados desde "
+            f"{perfil.retention.counted_from} ({perfil.retention.legal_basis}), en "
+            "almacenamiento inmutable de tipo WORM.",
             estilos["cuerpo"],
         ),
     ]
 
-    documento.build(flujo, onFirstPage=_pie, onLaterPages=_pie)
+    pie = _pie_para(perfil.text("expediente.pie"))
+    documento.build(flujo, onFirstPage=pie, onLaterPages=pie)
     contenido = buffer.getvalue()
 
     logger.info(

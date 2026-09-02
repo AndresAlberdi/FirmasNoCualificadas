@@ -9,6 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from jurisdictions import require_profile
 from pscnc.compliance.legal_guard import LegalGuard
 from pscnc.config import Settings, get_settings
 from pscnc.crypto.ca_signer import CaSigner, KmsCaSigner, LocalCaSigner
@@ -97,6 +98,7 @@ def build_signing_service() -> SigningService:
             timeout=settings.tsa_timeout_seconds,
             max_retries=settings.tsa_max_retries,
         ),
+        jurisdiction=require_profile(settings.jurisdiction, environment=settings.environment),
     )
 
     return SigningService(
@@ -110,10 +112,11 @@ def build_signing_service() -> SigningService:
         onboarding=build_onboarding_client(settings),
         certificate_authority=ca,
         signer=signer,
-        legal_guard=LegalGuard(),
+        legal_guard=LegalGuard.for_jurisdiction(settings.jurisdiction),
         min_facial_match_score=settings.min_facial_match_score,
         session_ttl_minutes=settings.session_ttl_minutes,
         presigned_ttl=settings.presigned_url_ttl,
+        jurisdiction=settings.jurisdiction,
     )
 
 

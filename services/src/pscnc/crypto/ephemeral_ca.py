@@ -3,8 +3,8 @@
 Flujo por transacción:
 
 1. Se genera un par de claves RSA-2048 en memoria del contenedor.
-2. Se construye el ``TBSCertificate`` con el perfil exigido por la Resolución MIC
-   N.º 262/2024 (`DOC-ICPP-20 v2.0`).
+2. Se construye el ``TBSCertificate`` con el perfil de certificado que exige la
+   jurisdicción activa (país del sujeto y formato del ``serialNumber``).
 3. Se calcula su digest SHA-256 y se firma con la CA intermedia residente en KMS.
 4. Tras producir el bloque CMS, la clave privada se descarta.
 
@@ -23,6 +23,7 @@ from asn1crypto import algos, keys, x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
+from jurisdictions import JurisdictionProfile
 from pscnc.crypto.ca_signer import ALGORITMOS_SOPORTADOS, CaSigner, sha256_digest
 from pscnc.errors import SigningError
 from pscnc.logging_setup import get_logger
@@ -38,17 +39,45 @@ TAMANIO_CLAVE_FIRMANTE = 2048
 
 @dataclass(frozen=True, slots=True)
 class SubjectData:
-    """Datos del firmante que se vuelcan al sujeto del certificado."""
+    """Datos del firmante que se vuelcan al sujeto del certificado.
+
+    El país y el prefijo del ``serialNumber`` no tienen valor por defecto a
+    propósito: se toman del perfil de la jurisdicción (ADR-0008). Un certificado
+    que dijera ``C=PY`` y ``serialNumber=PY-…`` sobre un firmante de otro país
+    validaría criptográficamente y mentiría sobre la identidad del titular, que es
+    exactamente lo que no puede pasar en un documento probatorio.
+    """
 
     common_name: str
     national_id: str
-    country: str = "PY"
+    country: str
+    serial_prefix: str
     transaction_id: str = ""
     email: str | None = None
 
+    @classmethod
+    def for_jurisdiction(
+        cls,
+        profile: JurisdictionProfile,
+        *,
+        common_name: str,
+        national_id: str,
+        transaction_id: str = "",
+        email: str | None = None,
+    ) -> SubjectData:
+        """Construye el sujeto tomando país y prefijo del perfil."""
+        return cls(
+            common_name=common_name,
+            national_id=national_id,
+            country=profile.certificate_country,
+            serial_prefix=profile.certificate_serial_prefix,
+            transaction_id=transaction_id,
+            email=email,
+        )
+
     @property
     def serial_number(self) -> str:
-        return f"PY-{self.national_id}"
+        return f"{self.serial_prefix}-{self.national_id}"
 
 
 @dataclass(frozen=True, slots=True)

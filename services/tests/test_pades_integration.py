@@ -24,6 +24,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
+from jurisdictions import get_profile
 from pscnc.crypto.ephemeral_ca import EphemeralCertificateAuthority, SubjectData
 from pscnc.crypto.pades import PadesSigner, VisualSignatureSpec
 from pscnc.crypto.tsa import RecordingTimeStamper
@@ -100,12 +101,17 @@ def firmante(ca_certificate_der, ca_signer, tsa_material):  # type: ignore[no-un
             delegate=DummyTimeStamper(tsa_cert=tsa_cert, tsa_key=tsa_key),
         )
 
-    return PadesSigner(certificate_authority=autoridad, timestamper_factory=_fabrica)
+    return PadesSigner(
+        certificate_authority=autoridad,
+        timestamper_factory=_fabrica,
+        jurisdiction=get_profile("PY"),
+    )
 
 
 @pytest.fixture()
 def sujeto() -> SubjectData:
-    return SubjectData(
+    return SubjectData.for_jurisdiction(
+        get_profile("PY"),
         common_name="Firmante De Prueba",
         national_id="4829153",
         transaction_id="9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",

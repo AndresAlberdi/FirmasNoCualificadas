@@ -18,7 +18,7 @@ def test_normaliza_acentos_y_mayusculas() -> None:
 
 
 def test_bloquea_acto_excluido() -> None:
-    guard = LegalGuard()
+    guard = LegalGuard.for_jurisdiction("PY")
     veredicto = guard.evaluate_text(
         "Por el presente instrumento se constituye HIPOTECA sobre el inmueble."
     )
@@ -28,14 +28,14 @@ def test_bloquea_acto_excluido() -> None:
 
 def test_bloquea_pese_a_los_acentos() -> None:
     """La detección no puede depender de la acentuación del documento."""
-    guard = LegalGuard()
+    guard = LegalGuard.for_jurisdiction("PY")
     veredicto = guard.evaluate_text("Escritura Pública de donación entre vivos")
     assert veredicto.allowed is False
     assert {"escritura publica", "donacion"} <= set(veredicto.blocking_terms)
 
 
 def test_permite_contrato_ordinario() -> None:
-    guard = LegalGuard()
+    guard = LegalGuard.for_jurisdiction("PY")
     veredicto = guard.evaluate_text(
         "Contrato de prestacion de servicios de consultoria por doce meses."
     )
@@ -44,7 +44,7 @@ def test_permite_contrato_ordinario() -> None:
 
 
 def test_marca_para_revision_sin_bloquear() -> None:
-    guard = LegalGuard()
+    guard = LegalGuard.for_jurisdiction("PY")
     veredicto = guard.evaluate_text("El deudor suscribe un pagare a la orden.")
     assert veredicto.allowed is True
     assert veredicto.requires_human_review is True
@@ -52,7 +52,7 @@ def test_marca_para_revision_sin_bloquear() -> None:
 
 
 def test_enforce_lanza_excepcion_con_detalle() -> None:
-    guard = LegalGuard()
+    guard = LegalGuard.for_jurisdiction("PY")
     veredicto = guard.evaluate_text("Testamento ológrafo del causante.")
     with pytest.raises(LegallyExcludedDocumentError) as excepcion:
         guard.enforce(veredicto, transaction_id="tx-1")
@@ -61,7 +61,7 @@ def test_enforce_lanza_excepcion_con_detalle() -> None:
 
 def test_documento_sin_texto_extraible_no_bloquea_pero_se_marca() -> None:
     """Un PDF escaneado no puede analizarse léxicamente: se marca para revisión."""
-    guard = LegalGuard()
+    guard = LegalGuard.for_jurisdiction("PY")
     veredicto = guard.evaluate_pdf(b"esto no es un pdf")
     assert isinstance(veredicto, ComplianceVerdict)
     assert veredicto.allowed is True
@@ -70,7 +70,7 @@ def test_documento_sin_texto_extraible_no_bloquea_pero_se_marca() -> None:
 
 
 def test_politica_estricta_bloquea_si_no_hay_texto() -> None:
-    guard = LegalGuard(block_on_extraction_failure=True)
+    guard = LegalGuard.for_jurisdiction("PY", block_on_extraction_failure=True)
     with pytest.raises(LegallyExcludedDocumentError):
         guard.evaluate_pdf(b"esto no es un pdf")
 
