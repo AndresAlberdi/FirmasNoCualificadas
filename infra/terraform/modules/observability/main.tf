@@ -34,6 +34,25 @@ resource "aws_s3_bucket" "trail" {
   })
 }
 
+# El bucket guarda el registro de todas las operaciones de KMS, que es lo que
+# hace auditable una firma (ADR-0006): una firma sin su traza en CloudTrail no
+# es verificable. Se cifra con la clave gestionada por el cliente, no con la
+# clave de servicio de AWS, para que el acceso quede sujeto a la política de esa
+# clave y quede registrado a su vez.
+resource "aws_s3_bucket_server_side_encryption_configuration" "trail" {
+  bucket = aws_s3_bucket.trail.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = var.kms_key_arn
+    }
+    # Reduce el costo y la latencia de las llamadas a KMS reutilizando la clave
+    # de datos dentro de un mismo contexto de cifrado.
+    bucket_key_enabled = true
+  }
+}
+
 resource "aws_s3_bucket_public_access_block" "trail" {
   bucket                  = aws_s3_bucket.trail.id
   block_public_acls       = true

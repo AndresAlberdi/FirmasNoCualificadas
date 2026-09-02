@@ -49,6 +49,11 @@ variable "kms_ca_key_arn" {
   type        = string
 }
 
+variable "kms_evidence_key_arn" {
+  description = "ARN de la clave KMS simétrica con la que se cifra el bucket de la CRL."
+  type        = string
+}
+
 variable "lambda_package_path" {
   description = "Ruta local al paquete ZIP de la función de publicación de la CRL."
   type        = string

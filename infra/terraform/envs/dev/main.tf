@@ -229,10 +229,11 @@ module "api_edge" {
 module "crl_distribution" {
   source = "../../modules/crl-distribution"
 
-  environment         = local.environment
-  crl_bucket_name     = var.crl_bucket_name
-  kms_ca_key_arn      = module.intermediate_ca.key_arn
-  lambda_package_path = var.crl_lambda_package_path
-  secops_topic_arn    = module.observability.secops_topic_arn
-  tags                = local.common_tags
+  environment          = local.environment
+  crl_bucket_name      = var.crl_bucket_name
+  kms_ca_key_arn       = module.intermediate_ca.key_arn
+  kms_evidence_key_arn = aws_kms_key.data.arn
+  lambda_package_path  = var.crl_lambda_package_path
+  secops_topic_arn     = module.observability.secops_topic_arn
+  tags                 = local.common_tags
 }
