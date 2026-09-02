@@ -27,6 +27,7 @@ import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Protocol
 
 from jurisdictions import JurisdictionProfile, UnknownJurisdictionError, get_profile
 from pscnc.crypto.ephemeral_ca import SubjectData
@@ -108,6 +109,21 @@ class Transaction:
     timestamp_authority: str | None = None
 
 
+class TransactionStore(Protocol):
+    """Contrato del almacén de transacciones.
+
+    El servicio depende de esto y no de una clase concreta, para que la
+    implementación persistente y la de memoria sean intercambiables sin que el
+    servicio sepa cuál está activa.
+    """
+
+    def guardar(self, transaccion: Transaction) -> None: ...
+
+    def obtener(self, transaction_id: str) -> Transaction | None: ...
+
+    def obtener_por_codigo(self, codigo: str) -> Transaction | None: ...
+
+
 class TransactionRepository:
     """Almacén de transacciones en memoria, para desarrollo y pruebas.
 
@@ -139,7 +155,7 @@ class TransactionService:
     def __init__(
         self,
         *,
-        repositorio: TransactionRepository,
+        repositorio: TransactionStore,
         sellador: ActaSealer,
         jurisdiccion_por_defecto: str,
         ttl_minutos: int = 60,

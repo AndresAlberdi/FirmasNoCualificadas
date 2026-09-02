@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     kms_ca_key_id: str = ""
     kms_signing_algorithm: str = "RSASSA_PKCS1_V1_5_SHA_256"
     audit_table: str = "PSCNC_Audit_Trail"
+    # Tabla propia, separada de la de auditoría: aquella no puede expirar y
+    # esta sí (T-11). Vacía en desarrollo, donde se usa el almacén en memoria.
+    idempotency_table: str = ""
     signed_bucket: str = ""
     evidence_bucket: str = ""
     presigned_url_ttl: int = Field(default=300, ge=60, le=900)
