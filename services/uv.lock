@@ -1931,6 +1931,11 @@ dev = [
     { name = "types-requests" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pyyaml" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "asn1crypto", specifier = ">=1.5,<2.0" },
@@ -1962,6 +1967,9 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32,<1.0" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pyyaml", specifier = ">=6.0.3" }]
 
 [[package]]
 name = "py-partiql-parser"

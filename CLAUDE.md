@@ -46,6 +46,8 @@ make tf-validate      # valida el Terraform del entorno ENV (por defecto dev)
 make tf-plan          # plan del entorno ENV
 make tf-test          # pruebas de infraestructura (no necesitan credenciales)
 make tf-jurisdiccion  # regenera jurisdiccion.auto.tfvars desde el perfil
+make sdk-test         # pruebas de contrato del SDK de TypeScript
+make openapi          # regenera api/openapi.yaml desde la aplicación
 ```
 
 **Antes de cualquier commit:** `make test` tiene que pasar. Incluye `mypy --strict`, que hoy
@@ -129,9 +131,10 @@ todavía y la fase que las cubre es parte del trabajo, no un extra.**
    → `test_audit_trail_model.py::test_rechaza_hashes_identicos`
 
 4. **Datos sensibles aislados.** Biometría, cédula, declaraciones de salud y condición PEP no
-   salen hacia analítica, monitoreo de errores, CRM ni servicios de IA. Si agregás
-   instrumentación, excluí explícitamente esos campos.
-   → **PENDIENTE** (fase 6)
+   salen hacia analítica, monitoreo de errores, CRM ni servicios de IA, ni viajan en el acta
+   ni en la constancia pública. Si agregás instrumentación, excluí explícitamente esos campos.
+   → `test_contrato_v1.py::TestDatosSensiblesAislados`,
+   `test_acta_sellada.py::test_el_acta_no_contiene_datos_personales`
 
 5. **Evidencia append-only.** Nunca se sobrescribe ni se borra un registro. Una corrección
    escribe `METADATA#V{n+1}`; el repositorio no expone borrado ni actualización, y la
@@ -200,11 +203,12 @@ todavía y la fase que las cubre es parte del trabajo, no un extra.**
 
 14. **FNC no vuelve a decidir la identidad.** Recibe la decisión del tenant y la asienta como
     evidencia. El umbral propio es informativo, no un control (ADR-0009).
-    → **PENDIENTE** (fase 6)
+    → `test_contrato_v1.py::TestIdentidadDelTenant`
 
 15. **Todo error devuelve un motivo enumerado y estable**, nunca un mensaje libre: el tenant
-    tiene que poder mapearlo a su máquina de estados.
-    → parcialmente cubierto por `errors.py`; **falta el test de estabilidad** (fase 6)
+    tiene que poder mapearlo a su máquina de estados. Agregar un motivo es compatible;
+    renombrarlo rompe el `match` del tenant en silencio.
+    → `test_contrato_v1.py::TestMotivosEstables`, más la suite de contrato del SDK
 
 ---
 
@@ -271,6 +275,35 @@ Agregar un país es agregar un paquete bajo `jurisdictions/` y una entrada en su
 El recorrido del firmante es idéntico en ambos: el nivel es una propiedad del contrato. El
 nivel 2 **no puede ofrecerse en producción** hasta que se cumplan los tres bloqueantes de
 `docs/PENDIENTES.md` §1.
+
+---
+
+## Contrato público v1 (ADR-0009)
+
+```
+POST /v1/transactions                 abre la transacción
+POST /v1/transactions/{id}/confirm    confirma y sella el acta
+GET  /v1/transactions/{id}/artifacts  recupera lo producido
+GET  /v1/verify/{code}                constancia pública, SIN autenticación
+GET  /.well-known/fnc-keys.json       claves públicas, SIN autenticación
+```
+
+Lo que un integrador tiene que entender antes de programar:
+
+* **La identidad la decide el tenant.** FNC solo lee su veredicto. Dos controles sobre el
+  mismo acto no se suman: gana el más laxo.
+* **El OTP del tenant es evidencia, no control.** Viaja la referencia, nunca el código.
+* **Hash-only por defecto.** Lo que no se recibe no se filtra.
+* **`Idempotency-Key` obligatoria en las escrituras.** Una confirmación repetida devuelve el
+  acta original: dos actas para un mismo acto son dos evidencias divergentes del mismo
+  hecho, y eso sirve para impugnar las dos.
+* **Los rechazos se leen por `motivo`**, nunca por el mensaje.
+
+`api/openapi.yaml` se genera (`make openapi`) y se versiona: un cambio del contrato aparece
+como diff en el PR, que es donde se nota que se rompió la compatibilidad de un tenant.
+
+`sdk/typescript/` exporta `runFncContractTests`: la suite que un adaptador de tenant ejecuta
+**contra sí mismo** para probar que cumple el contrato, en vez de afirmarlo.
 
 ---
 
