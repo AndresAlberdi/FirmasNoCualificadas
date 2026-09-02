@@ -86,7 +86,9 @@ services/src/pscnc/
   evidence/         expediente de evidencias
   onboarding/       cliente del proveedor de identidad del tenant
   jobs/             publicación de CRL
-jurisdictions/      perfiles por país — el ÚNICO lugar con literales de norma (ADR-0008)
+services/src/jurisdictions/
+  profile.py        contrato de un perfil; py/ y bo/ los perfiles y sus textos
+                    el ÚNICO lugar con literales de norma, país u organismo (ADR-0008)
 infra/terraform/    módulos por dominio, composición por entorno
 api/openapi.yaml    contrato público
 sdk/typescript/     SDK de referencia y tests de contrato para adaptadores de tenant
@@ -173,8 +175,12 @@ todavía y la fase que las cubre es parte del trabajo, no un extra.**
 
 ### Jurisdicción y contrato con el tenant
 
-13. **Ningún literal de norma, país u organismo fuera de `jurisdictions/`.**
-    → **PENDIENTE** (fase 3, con test que recorre el árbol de código)
+13. **Ningún literal de norma, país u organismo fuera de `jurisdictions/`.** La regla
+    se verifica sobre el árbol sintáctico y alcanza a los **valores**, no a los comentarios
+    ni a la documentación: un comentario que cita la norma explica por qué existe una
+    decisión; un valor que la cita emite un certificado.
+    → `test_jurisdicciones.py::test_sin_literales_de_jurisdiccion_fuera_del_modulo`,
+    con `::test_el_detector_encuentra_un_literal_prohibido` verificando el detector mismo
 
 14. **FNC no vuelve a decidir la identidad.** Recibe la decisión del tenant y la asienta como
     evidencia. El umbral propio es informativo, no un control (ADR-0009).
@@ -209,6 +215,31 @@ Reglas que gobiernan las transiciones:
 
 Toda transición pasa por `orchestrator/state_machine.py`. **Ningún handler de FastAPI
 modifica el estado directamente.**
+
+---
+
+## Jurisdicciones (ADR-0008)
+
+```python
+from jurisdictions import require_profile
+
+perfil = require_profile(settings.jurisdiction, environment=settings.environment)
+perfil.signature_law_citation       # norma citada en la constancia
+perfil.subject_serial_number(ci)    # serialNumber del certificado
+perfil.signer_index_key(ci)         # clave del índice pericial
+perfil.retention.minimum_days       # conservación mínima
+perfil.text("firma.motivo")         # texto de producto
+```
+
+`require_profile` **se niega a devolver un perfil sin validación legal** en `staging` y
+`prod`. Hoy `BO` es uno de esos: existe para demostrar que la arquitectura generaliza —su
+documento admite complemento alfanumérico, así que rompe cualquier `^[0-9]+$` que hubiera
+quedado escondido— y no para producir evidencia oponible. Sus campos normativos llevan
+`[SIN VERIFICAR]` y no declara ninguna TSA, porque afirmar que un prestador está habilitado
+sin comprobarlo sería inventarlo.
+
+Agregar un país es agregar un paquete bajo `jurisdictions/` y una entrada en su registro.
+**Si hace falta tocar el motor, el perfil está incompleto.**
 
 ---
 

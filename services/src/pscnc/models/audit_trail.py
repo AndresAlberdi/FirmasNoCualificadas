@@ -21,6 +21,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from jurisdictions import DEFAULT_JURISDICTION, JurisdictionProfile, get_profile
+
 HexSha256 = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
 UuidV4 = Annotated[
     str,
@@ -53,8 +55,13 @@ class LivenessMeta(_Base):
 class IdentityEvidence(_Base):
     """Vinculación unívoca de la firma con una persona física verificada."""
 
-    document_type: Literal["CI_PY", "PASAPORTE"]
-    national_id: str = Field(pattern=r"^[0-9]+$", min_length=4, max_length=15)
+    # El catálogo de documentos admitidos y el formato de su número los fija el
+    # perfil de la jurisdicción (ADR-0008): un `Literal["CI_PY", ...]` acá haría
+    # que agregar un país exigiera tocar el modelo de evidencia. La validación
+    # contra el perfil se aplica en `AuditTrailItem`, que es quien conoce la
+    # jurisdicción de la transacción.
+    document_type: str = Field(pattern=r"^[A-Z][A-Z0-9_]{1,20}$")
+    national_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9 -]{2,19}$")
     first_name: str = Field(min_length=1)
     last_name: str = Field(min_length=1)
     birth_date: date
@@ -71,10 +78,9 @@ class IdentityEvidence(_Base):
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}".strip()
 
-    @property
-    def subject_serial_number(self) -> str:
-        """Identificador del sujeto en el certificado X.509 (perfil DOC-ICPP-20)."""
-        return f"PY-{self.national_id}"
+    def subject_serial_number(self, profile: JurisdictionProfile) -> str:
+        """Identificador del sujeto en el certificado X.509, según la jurisdicción."""
+        return profile.subject_serial_number(self.national_id)
 
 
 # --------------------------------------------------------------------- Red
@@ -163,13 +169,17 @@ class AuditTrailItem(_Base):
 
     PK: str = Field(pattern=r"^TX#")
     SK: str = Field(pattern=r"^METADATA#V[0-9]+$")
-    GSI1PK: str = Field(pattern=r"^CI#PY-[0-9]+$")
+    GSI1PK: str = Field(pattern=r"^CI#[A-Z]{2}-[A-Za-z0-9 -]{3,20}$")
     GSI1SK: datetime
     GSI2PK: str = Field(pattern=r"^CLIENT#[a-zA-Z0-9_.-]+$")
     GSI2SK: datetime
 
     transaction_id: UuidV4
     b2b_client_id: str = Field(pattern=r"^[a-zA-Z0-9_.-]+$")
+    #: Jurisdicción bajo la que se produjo el acto. Determina la norma citada, el
+    #: formato del documento de identidad y el plazo de conservación. Viaja también
+    #: en el acta sellada (ADR-0006).
+    jurisdiction: str = Field(default=DEFAULT_JURISDICTION, pattern=r"^[A-Z]{2}$")
     status: SigningStatus
     created_at: datetime
     completed_at: datetime | None = None
@@ -201,8 +211,15 @@ class AuditTrailItem(_Base):
         """
         if f"TX#{self.transaction_id}" != self.PK:
             raise ValueError("PK inconsistente con transaction_id")
-        if f"CI#{self.identity_evidence.subject_serial_number}" != self.GSI1PK:
-            raise ValueError("GSI1PK inconsistente con la cédula del firmante")
+        perfil = get_profile(self.jurisdiction)
+        if perfil.signer_index_key(self.identity_evidence.national_id) != self.GSI1PK:
+            raise ValueError("GSI1PK inconsistente con el documento del firmante")
+        # El documento declarado tiene que existir en la jurisdicción y su número
+        # respetar el formato: una cédula boliviana con complemento alfanumérico no
+        # es válida bajo el perfil paraguayo, y al revés.
+        perfil.validate_national_id(
+            self.identity_evidence.document_type, self.identity_evidence.national_id
+        )
         if f"CLIENT#{self.b2b_client_id}" != self.GSI2PK:
             raise ValueError("GSI2PK inconsistente con b2b_client_id")
         if self.status is SigningStatus.SIGNING_COMPLETED:
@@ -226,12 +243,13 @@ class AuditTrailItem(_Base):
         b2b_client_id: str,
         created_at: datetime,
         version: int = 1,
+        jurisdiction: str = DEFAULT_JURISDICTION,
     ) -> dict[str, object]:
         """Construye las claves primarias y de índice de forma centralizada."""
         return {
             "PK": f"TX#{transaction_id}",
             "SK": f"METADATA#V{version}",
-            "GSI1PK": f"CI#PY-{national_id}",
+            "GSI1PK": get_profile(jurisdiction).signer_index_key(national_id),
             "GSI1SK": created_at,
             "GSI2PK": f"CLIENT#{b2b_client_id}",
             "GSI2SK": created_at,

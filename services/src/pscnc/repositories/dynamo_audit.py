@@ -22,6 +22,7 @@ from boto3.dynamodb.conditions import ConditionBase, Key
 from botocore.config import Config as BotoConfig
 from botocore.exceptions import ClientError
 
+from jurisdictions import DEFAULT_JURISDICTION, get_profile
 from pscnc.errors import EvidencePersistenceError, SigningSessionNotFoundError, TenantMismatchError
 from pscnc.logging_setup import get_logger
 from pscnc.models.audit_trail import AuditTrailItem
@@ -176,17 +177,27 @@ class AuditTrailRepository:
         return [AuditTrailItem.model_validate(_from_dynamo(i)) for i in respuesta.get("Items", [])]
 
     def list_by_national_id(
-        self, national_id: str, context: SecurityContext, *, limite: int = 50
+        self,
+        national_id: str,
+        context: SecurityContext,
+        *,
+        jurisdiction: str = DEFAULT_JURISDICTION,
+        limite: int = 50,
     ) -> list[AuditTrailItem]:
         """Consulta pericial por cédula, restringida al inquilino autenticado.
 
         El filtro por inquilino se aplica después de la consulta al índice: el GSI1
         es global por diseño (una pericia necesita ver todas las firmas de una
         persona), pero un cliente B2B solo puede ver las suyas.
+
+        La jurisdicción es parte de la clave porque dos países pueden emitir el
+        mismo número de documento a personas distintas.
         """
         respuesta = self._table.query(
             IndexName="GSI1-Signer",
-            KeyConditionExpression=Key("GSI1PK").eq(f"CI#PY-{national_id}"),
+            KeyConditionExpression=Key("GSI1PK").eq(
+                get_profile(jurisdiction).signer_index_key(national_id)
+            ),
             ScanIndexForward=False,
             Limit=min(limite, 200),
         )

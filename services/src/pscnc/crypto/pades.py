@@ -20,6 +20,7 @@ import io
 from dataclasses import dataclass
 from typing import Any
 
+from jurisdictions import JurisdictionProfile
 from pscnc.crypto.ephemeral_ca import EphemeralCertificateAuthority, IssuedCertificate, SubjectData
 from pscnc.crypto.tsa import RecordingTimeStamper, TimestampResult
 from pscnc.errors import DocumentIntegrityError, SigningError
@@ -79,13 +80,15 @@ class PadesSigner:
         *,
         certificate_authority: EphemeralCertificateAuthority,
         timestamper_factory: Any,
-        signature_reason: str = "Firma Electronica No Cualificada - Ley N 6822/2021 (Paraguay)",
-        signature_location: str = "Paraguay",
+        jurisdiction: JurisdictionProfile,
     ) -> None:
         self._ca = certificate_authority
         self._timestamper_factory = timestamper_factory
-        self._reason = signature_reason
-        self._location = signature_location
+        # El motivo y el lugar quedan impresos en el panel de firma del PDF y los
+        # lee cualquier validador: citan la norma de la jurisdicción, no una
+        # constante (ADR-0008).
+        self._reason = jurisdiction.text("firma.motivo")
+        self._location = jurisdiction.text("firma.lugar")
 
     def sign(
         self,

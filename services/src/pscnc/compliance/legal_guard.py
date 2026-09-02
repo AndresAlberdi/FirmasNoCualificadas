@@ -6,9 +6,15 @@ no discriminación, pero **no sustituye la forma solemne** cuando la ley la exig
 Firmar uno de esos actos con una FENC no produce un documento válido: produce un
 pasivo legal para la plataforma y para su cliente B2B.
 
-Este módulo materializa esa frontera. La lista de exclusiones es **configurable y
-debe ser revisada y aprobada por asesoría legal paraguaya** antes de producción;
-su historial en el control de versiones constituye evidencia de diligencia.
+Este módulo materializa esa frontera, pero **no decide dónde está**: el motor de
+detección —normalización, análisis léxico, veredicto— es común a toda jurisdicción,
+y *qué* se bloquea sale del perfil correspondiente (ADR-0008). Un testamento está
+excluido en Paraguay por su forma solemne, y esa razón no se exporta sola a otro
+ordenamiento.
+
+La lista de cada jurisdicción **debe ser revisada y aprobada por asesoría legal
+local** antes de producción; su historial en el control de versiones constituye
+evidencia de diligencia.
 
 Limitación conocida y deliberada: la detección es léxica y no sustituye la
 revisión legal del cliente B2B. Se prefiere el falso positivo (bloquear y exigir
@@ -20,51 +26,13 @@ from __future__ import annotations
 import io
 import re
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
+from jurisdictions import JurisdictionProfile, get_profile
 from pscnc.errors import BiometricThresholdError, LegallyExcludedDocumentError
 from pscnc.logging_setup import get_logger
 
 logger = get_logger(__name__)
-
-# Términos que indican actos con forma solemne o excluidos de la firma simple.
-# Revisión legal obligatoria antes de cada modificación.
-EXCLUSIONES_POR_DEFECTO: frozenset[str] = frozenset(
-    {
-        "testamento",
-        "acto de ultima voluntad",
-        "sucesion",
-        "hipoteca",
-        "prenda con registro",
-        "donacion",
-        "escritura publica",
-        "compraventa de inmueble",
-        "transferencia de inmueble",
-        "usufructo",
-        "matrimonio",
-        "capitulaciones matrimoniales",
-        "divorcio",
-        "adopcion",
-        "reconocimiento de filiacion",
-        "poder general",
-        "poder especial para juicios",
-        "constitucion de sociedad anonima",
-        "cesion de derechos hereditarios",
-        "fideicomiso",
-    }
-)
-
-# Términos que exigen revisión humana pero no bloquean automáticamente.
-ADVERTENCIAS_POR_DEFECTO: frozenset[str] = frozenset(
-    {
-        "aval",
-        "fianza solidaria",
-        "pagare",
-        "contrato de trabajo",
-        "renuncia de derechos",
-        "confesion de deuda",
-    }
-)
 
 MAX_CARACTERES_ANALIZADOS = 200_000
 
@@ -96,11 +64,36 @@ class ComplianceVerdict:
 
 @dataclass(slots=True)
 class LegalGuard:
-    """Evalúa si un documento puede firmarse con una FENC."""
+    """Evalúa si un documento puede firmarse con una FENC en una jurisdicción."""
 
-    excluded_terms: frozenset[str] = field(default=EXCLUSIONES_POR_DEFECTO)
-    warning_terms: frozenset[str] = field(default=ADVERTENCIAS_POR_DEFECTO)
+    excluded_terms: frozenset[str]
+    warning_terms: frozenset[str] = frozenset()
     block_on_extraction_failure: bool = False
+    #: Texto de rechazo de la jurisdicción, para no incrustarlo en el motor.
+    rejection_text: str = (
+        "El documento contiene indicios de un acto jurídico que requiere forma "
+        "solemne o está excluido de la firma electrónica no cualificada."
+    )
+
+    @classmethod
+    def for_jurisdiction(
+        cls, code: str, *, block_on_extraction_failure: bool = False
+    ) -> LegalGuard:
+        """Construye el guardián a partir del perfil de una jurisdicción."""
+        return cls.from_profile(
+            get_profile(code), block_on_extraction_failure=block_on_extraction_failure
+        )
+
+    @classmethod
+    def from_profile(
+        cls, profile: JurisdictionProfile, *, block_on_extraction_failure: bool = False
+    ) -> LegalGuard:
+        return cls(
+            excluded_terms=profile.restrictions.excluded,
+            warning_terms=profile.restrictions.warning,
+            block_on_extraction_failure=block_on_extraction_failure,
+            rejection_text=profile.text("rechazo.acto_excluido"),
+        )
 
     # ------------------------------------------------------------------ API --
     def evaluate_text(self, texto: str) -> ComplianceVerdict:
@@ -159,9 +152,7 @@ class LegalGuard:
             blocking_terms=list(verdict.blocking_terms),
         )
         raise LegallyExcludedDocumentError(
-            "El documento contiene indicios de un acto jurídico que requiere forma "
-            "solemne o está excluido de la firma electrónica no cualificada. "
-            "La operación se bloquea conforme a la política de uso del servicio.",
+            self.rejection_text,
             detail={"blocking_terms": list(verdict.blocking_terms)},
         )
 

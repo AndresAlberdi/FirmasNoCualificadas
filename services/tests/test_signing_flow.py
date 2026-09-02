@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from jurisdictions import get_profile
 from pscnc.compliance.legal_guard import LegalGuard
 from pscnc.crypto.ephemeral_ca import EphemeralCertificateAuthority
 from pscnc.crypto.pades import PadesSigner
@@ -149,6 +150,7 @@ def servicio(ca_certificate_der, ca_signer):  # type: ignore[no-untyped-def]
             provider_name="TSA de Pruebas",
             delegate=DummyTimeStamper(tsa_cert=tsa_cert, tsa_key=tsa_key),
         ),
+        jurisdiction=get_profile("PY"),
     )
 
     repositorio = RepositorioEnMemoria()
@@ -159,7 +161,7 @@ def servicio(ca_certificate_der, ca_signer):  # type: ignore[no-untyped-def]
         onboarding=SandboxOnboardingClient(),
         certificate_authority=autoridad,
         signer=firmante,
-        legal_guard=LegalGuard(),
+        legal_guard=LegalGuard.for_jurisdiction("PY"),
     )
     return servicio, repositorio, boveda
 

@@ -22,6 +22,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from jurisdictions import DEFAULT_JURISDICTION, get_profile
 from pscnc.compliance.legal_guard import LegalGuard, enforce_biometric_threshold
 from pscnc.crypto.ephemeral_ca import EphemeralCertificateAuthority, SubjectData
 from pscnc.crypto.pades import PadesSigner, VisualSignatureSpec, sha256_hex
@@ -79,6 +80,7 @@ class SigningService:
         min_facial_match_score: float = 0.95,
         session_ttl_minutes: int = 60,
         presigned_ttl: int = 300,
+        jurisdiction: str = DEFAULT_JURISDICTION,
     ) -> None:
         self._repo = repository
         self._vault = vault
@@ -89,6 +91,7 @@ class SigningService:
         self._min_score = min_facial_match_score
         self._ttl = timedelta(minutes=session_ttl_minutes)
         self._presigned_ttl = presigned_ttl
+        self._jurisdiction = jurisdiction.upper()
 
     # ------------------------------------------------------- Inicialización --
     def create_session(
@@ -140,9 +143,11 @@ class SigningService:
                 b2b_client_id=context.b2b_client_id,
                 created_at=ahora,
                 version=1,
+                jurisdiction=self._jurisdiction,
             ),
             transaction_id=transaction_id,
             b2b_client_id=context.b2b_client_id,
+            jurisdiction=self._jurisdiction,
             status=SigningStatus.INITIALIZED,
             created_at=ahora,
             document_filename=filename,
@@ -222,11 +227,11 @@ class SigningService:
 
         resultado = self._signer.sign(
             original,
-            SubjectData(
+            SubjectData.for_jurisdiction(
+                get_profile(item.jurisdiction),
                 common_name=item.identity_evidence.full_name,
                 national_id=item.identity_evidence.national_id,
                 transaction_id=transaction_id,
-                email=None,
             ),
             visual=VisualSignatureSpec(
                 enabled=payload.visual_signature_enabled,
@@ -265,6 +270,7 @@ class SigningService:
                     b2b_client_id=item.b2b_client_id,
                     created_at=item.created_at,
                     version=version,
+                    jurisdiction=item.jurisdiction,
                 ),
                 "status": SigningStatus.SIGNING_COMPLETED,
                 "completed_at": ahora,

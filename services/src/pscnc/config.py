@@ -12,6 +12,8 @@ from typing import Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from jurisdictions import DEFAULT_JURISDICTION
+
 CryptoBackend = Literal["kms", "local"]
 Environment = Literal["sandbox", "dev", "staging", "prod"]
 
@@ -29,6 +31,12 @@ class Settings(BaseSettings):
     environment: Environment = "dev"
     crypto_backend: CryptoBackend = "local"
 
+    # Jurisdicción por defecto del despliegue. Cada tenant puede declarar la suya;
+    # esta es la que rige cuando no lo hace. De ella salen la norma citada, el
+    # formato del documento de identidad, el plazo de conservación y la lista de
+    # actos excluidos (ADR-0008).
+    jurisdiction: str = DEFAULT_JURISDICTION
+
     # --- AWS -----------------------------------------------------------------
     aws_region: str = Field(default="us-east-1", alias="AWS_REGION")
     kms_ca_key_id: str = ""
@@ -40,9 +48,8 @@ class Settings(BaseSettings):
 
     # --- Identidad de la CA intermedia --------------------------------------
     ca_common_name: str = "CA Intermedia FENC"
-    ca_organization: str = "PSCNC Paraguay"
+    ca_organization: str = "PSCNC"
     ca_organization_identifier: str = ""
-    ca_country: str = "PY"
     ca_cert_path: str = ""
     crl_distribution_url: str = ""
     cert_policy_oid: str = ""
@@ -84,6 +91,21 @@ class Settings(BaseSettings):
                 "la clave de la CA debe residir en AWS KMS."
             )
         return value
+
+    @field_validator("jurisdiction")
+    @classmethod
+    def _validar_jurisdiccion(cls, value: str, info: object) -> str:
+        """Falla al arranque si la jurisdicción no existe o no puede operar.
+
+        Un perfil sin validación legal sirve para probar que la arquitectura
+        generaliza; firmar con él produciría una constancia que cita una norma que
+        nadie verificó.
+        """
+        from jurisdictions import require_profile
+
+        data = getattr(info, "data", {}) or {}
+        require_profile(value, environment=data.get("environment", "dev"))
+        return value.upper()
 
     @property
     def is_production(self) -> bool:
