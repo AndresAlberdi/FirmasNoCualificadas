@@ -59,3 +59,14 @@ evidence-*.pdf
 # Artefactos de importación del scaffolding (no forman parte del producto)
 FirmasNoCualificadas-repo.tar.gz
 PROMPT_CLAUDE_CODE_IMPORTACION.md
+.deploy-log/
+.security-reports/
+serviceAccountKey*.json
+*-sa-key.json
+tfplan*
+*.tfstate*
+*.auto.tfvars
+secrets.tfvars
+.trivy-cache/
+.trivyignore.yaml
+.gitleaksignore

@@ -1,0 +1,134 @@
+# Manifiesto del estándar DevSecOps (esquema: .github/devsecops.schema.json;
+# generado por bootstrap-repo.sh v2.0 y adaptado al proyecto).
+version: 1
+proyecto: firmasnocualificadas
+modo: A            # Repositorio público: Code Scanning y Secret Scanning disponibles.
+cobertura_minima: 70
+
+# El repositorio todavía no despliega: no hay cuenta de AWS aprovisionada, ni
+# identidad federada, ni las tres condiciones del ADR-0007 que habilitan el
+# nivel 2 en producción (ver docs/PENDIENTES.md §1). Declararlo así evita que el
+# pipeline finja un despliegue contra URLs inexistentes; se cambia a `true`
+# cuando exista la cuenta y su OIDC, no antes.
+produccion: false
+
+componentes:
+  # Motor de firma: API FastAPI en contenedor, destinada a ECS Fargate.
+  - nombre: signer
+    ruta: ./services
+    stack: python
+    proveedor: ninguno    # pasa a `ecs` cuando exista la cuenta y su identidad federada
+    ambientes: {}
+
+  # Infraestructura. El `apply` es manual y con aprobación de dos personas en
+  # producción (ADR-0002), de modo que el pipeline solo valida: fmt, validate,
+  # checkov y plan. No despliega.
+  - nombre: infra
+    ruta: ./infra/terraform
+    stack: terraform
+    proveedor: ninguno
+    ambientes: {}
+
+  # Panel B2B. Hoy es un prototipo que se alimenta de datos simulados
+  # (`src/lib/mockData.ts`): no consume la API ni tiene suite de pruebas, así
+  # que se declara `static` y no `node`. Pasa a `node`, con sus pruebas y su
+  # umbral de cobertura, cuando la fase 8 lo convierta en producto
+  # (docs/PENDIENTES.md, T-06).
+  - nombre: dashboard
+    ruta: ./dashboard
+    stack: static
+    proveedor: ninguno
+    ambientes: {}
+
+seguridad:
+  # Sin entorno de staging desplegado no hay nada que escanear: el job completo
+  # se omite. Se habilita junto con `produccion`.
+  dast: false
+  zap_reglas: .github/zap-rules.tsv
+  bloquear_en: [CRITICAL, HIGH]   # se puede endurecer (añadir MEDIUM), nunca relajar
+  # Cada excepción vence: pasada esa fecha el hallazgo vuelve a bloquear.
+  excepciones:
+    - id: CVE-2026-59935
+      herramienta: trivy
+      componente: signer
+      justificacion: >-
+        Denegación de servicio en pypdf ante un PDF manipulado. No existe versión
+        corregida: 5.9.0 es la última publicada. El riesgo se acota por diseño:
+        el modo hash-only es el predeterminado (ADR-0009), de modo que el camino
+        que analiza el PDF es la excepción y no la regla; el tamaño está limitado
+        a 25 MiB y la extracción de texto se corta a 200.000 caracteres. Falta el
+        límite de tiempo de la extracción, registrado como T-07 en
+        docs/PENDIENTES.md. Se revisa en cada publicación de pypdf.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CVE-2026-59935
+      herramienta: osv-scanner
+      componente: signer
+      justificacion: >-
+        Denegación de servicio en pypdf ante un PDF manipulado. No existe versión
+        corregida: 5.9.0 es la última publicada. El riesgo se acota por diseño:
+        el modo hash-only es el predeterminado (ADR-0009), de modo que el camino
+        que analiza el PDF es la excepción y no la regla; el tamaño está limitado
+        a 25 MiB y la extracción de texto se corta a 200.000 caracteres. Falta el
+        límite de tiempo de la extracción, registrado como T-07 en
+        docs/PENDIENTES.md. Se revisa en cada publicación de pypdf.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CVE-2026-59936
+      herramienta: trivy
+      componente: signer
+      justificacion: >-
+        Denegación de servicio en pypdf ante un PDF manipulado. No existe versión
+        corregida: 5.9.0 es la última publicada. El riesgo se acota por diseño:
+        el modo hash-only es el predeterminado (ADR-0009), de modo que el camino
+        que analiza el PDF es la excepción y no la regla; el tamaño está limitado
+        a 25 MiB y la extracción de texto se corta a 200.000 caracteres. Falta el
+        límite de tiempo de la extracción, registrado como T-07 en
+        docs/PENDIENTES.md. Se revisa en cada publicación de pypdf.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CVE-2026-59936
+      herramienta: osv-scanner
+      componente: signer
+      justificacion: >-
+        Denegación de servicio en pypdf ante un PDF manipulado. No existe versión
+        corregida: 5.9.0 es la última publicada. El riesgo se acota por diseño:
+        el modo hash-only es el predeterminado (ADR-0009), de modo que el camino
+        que analiza el PDF es la excepción y no la regla; el tamaño está limitado
+        a 25 MiB y la extracción de texto se corta a 200.000 caracteres. Falta el
+        límite de tiempo de la extracción, registrado como T-07 en
+        docs/PENDIENTES.md. Se revisa en cada publicación de pypdf.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: AWS-0011
+      herramienta: trivy
+      componente: infra
+      justificacion: >-
+        La distribución de CloudFront que publica la lista de revocación no tiene
+        WAF. El contenido es público por diseño y está firmado por la CA, así que
+        no hay confidencialidad ni integridad que un WAF proteja; el riesgo real
+        es de disponibilidad y costo por tráfico anómalo. El WAF con limitación
+        de tasa se incorpora en la fase de infraestructura, junto con el resto
+        del perímetro que describe el blueprint. No hay infraestructura desplegada
+        (produccion: false), de modo que hoy el hallazgo no tiene exposición.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: AWS-0104
+      herramienta: trivy
+      componente: infra
+      justificacion: >-
+        El grupo de seguridad del motor de firma permite salida a 0.0.0.0/0 en el
+        puerto 443 únicamente. El servicio necesita alcanzar la TSA cualificada,
+        cuyo rango de direcciones se conocerá al contratarla (B-01 de
+        docs/PENDIENTES.md), y los servicios de AWS. La corrección definitiva son
+        los VPC endpoints para los servicios de AWS más un egreso restringido al
+        rango de la TSA, y se aborda en la fase de infraestructura. No hay
+        infraestructura desplegada, de modo que hoy el hallazgo no tiene exposición.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"

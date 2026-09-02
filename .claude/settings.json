@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./services/.env)",
+      "Read(./services/.env.*)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.key)",
+      "Read(./**/*.p12)",
+      "Bash(./deploy.sh prod*)",
+      "Bash(git push --force*)",
+      "Bash(terraform apply*)",
+      "Bash(terraform destroy*)",
+      "Bash(aws kms schedule-key-deletion*)",
+      "Bash(aws kms disable-key*)"
+    ]
+  }
+}

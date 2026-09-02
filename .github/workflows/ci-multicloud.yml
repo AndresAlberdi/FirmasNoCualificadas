@@ -1,0 +1,1002 @@
+# =============================================================================
+# ci-multicloud.yml — Pipeline dirigido por el manifiesto .devsecops.yml
+# Versión: 2.0 | Fecha: 2026-08-24
+# -----------------------------------------------------------------------------
+# Para monorepos o proyectos con varios componentes en distintas nubes
+# (p. ej. web en Firebase + api en Cloud Run + infra en OCI). Lee el manifiesto
+# `.devsecops.yml` (esquema en 00-gobernanza/05-estrategia-multicloud.md) y
+# genera matrices: cada componente pasa por calidad, seguridad-estatica y
+# construir en paralelo; después cada componente se despliega con el adaptador
+# de su proveedor (firebase | cloudrun | ecs | oci) y se verifica su URL.
+#
+# Los pasos por proveedor son versiones compactas de los workflows por stack
+# (ci-node-firebase.yml, ci-python-cloudrun.yml, ci-aws-ecs.yml,
+# ci-oci-terraform.yml): consulte esos archivos para el detalle y los
+# comentarios extensos de cada paso.
+#
+# Secretos (según proveedores usados): GCP_WIF_PROVIDER, GCP_SA_DEPLOY_STAGING,
+#   GCP_SA_DEPLOY_PROD, AWS_ROLE_ARN_STAGING, AWS_ROLE_ARN_PROD, OCI_* (API key)
+# Variables: MODO, APROBADORES_PROD, TAG_FIRMADO_REQUERIDO, GCP_REGION,
+#   ARTIFACT_REGISTRY_REPO, AWS_REGION, ECR_REPOSITORY, OCI_REGION,
+#   CLOUD_RUN_SA_STAGING, CLOUD_RUN_SA_PROD, CLOUD_RUN_SECRETS, GHAS_ENABLED,
+#   NODE_VERSION, PYTHON_VERSION, HEALTH_PATH, OCI_COMPARTMENT_OCID
+# Identificadores por componente/ambiente (proyecto, servicio, región, url,
+#   cluster, repositorio, compartimento, site) viven en el manifiesto, no en
+#   vars (con respaldo en vars.ARTIFACT_REGISTRY_REPO / vars.ECR_REPOSITORY).
+# =============================================================================
+name: CI/CD Multicloud (.devsecops.yml)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag vX.Y.Z ya creado (debe ser ancestro de main)
+        type: string
+        required: true
+      confirmar:
+        description: Escriba DESPLEGAR para publicar en producción desde el tag
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FIREBASE_TOOLS_VERSION: '15.28.1'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Fase 0 — preparar: lee y VALIDA .devsecops.yml (D4) y publica las matrices
+  # en JSON. Valida: version == 1, nombres únicos, proveedor soportado, url
+  # https, bloquear_en contiene CRITICAL y HIGH, excepciones vencidas (aviso) y
+  # en Modo B0 la fecha_modo (aviso >= 30 días, fallo >= 45).
+  # PyYAML está preinstalado en ubuntu-latest.
+  # ---------------------------------------------------------------------------
+  preparar:
+    name: preparar (leer .devsecops.yml)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      componentes: ${{ steps.m.outputs.componentes }}     # todos
+      desplegables: ${{ steps.m.outputs.desplegables }}   # proveedor != ninguno
+      hay_desplegables: ${{ steps.m.outputs.hay_desplegables }}
+      urls_staging: ${{ steps.m.outputs.urls_staging }}   # [{nombre,url}]
+      urls_production: ${{ steps.m.outputs.urls_production }}
+      hay_dast: ${{ steps.m.outputs.hay_dast }}
+      cobertura_minima: ${{ steps.m.outputs.cobertura_minima }}
+      bloquear_en: ${{ steps.m.outputs.bloquear_en }}
+      zap_reglas: ${{ steps.m.outputs.zap_reglas }}
+      ambiente: ${{ steps.m.outputs.ambiente }}           # staging | production
+      es_produccion: ${{ steps.m.outputs.es_produccion }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # En workflow_dispatch se analiza/despliega el tag aprobado (D3)
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Generar y validar matrices desde el manifiesto
+        id: m
+        env:
+          # D3: producción solo con tag estable (no prerelease) fuera de B0, o
+          # con dispatch confirmado (la aprobación se verifica en el job).
+          ES_PROD: >-
+            ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+                 && !contains(github.ref_name, '-') && vars.MODO != 'B0')
+                || (github.event_name == 'workflow_dispatch' && inputs.confirmar == 'DESPLEGAR') }}
+        run: |
+          python3 - <<'PY'
+          import datetime as dt, json, os, sys, yaml
+          with open(".devsecops.yml", encoding="utf-8") as f:
+              m = yaml.safe_load(f) or {}
+          errores = []
+          # --- Validaciones del manifiesto (D4) --------------------------------
+          if m.get("version") != 1:
+              errores.append(".devsecops.yml debe declarar version: 1")
+          PROVEEDORES = {"firebase", "cloudrun", "ecs", "oci", "ninguno"}
+          nombres = [c.get("nombre") for c in m.get("componentes", []) or []]
+          if len(nombres) != len(set(nombres)):
+              errores.append("componentes[].nombre debe ser único")
+          comps = []
+          for c in m.get("componentes", []) or []:
+              if c.get("proveedor", "ninguno") not in PROVEEDORES:
+                  errores.append(f"componente '{c.get('nombre')}': proveedor '{c.get('proveedor')}' no soportado ({', '.join(sorted(PROVEEDORES))})")
+              amb = c.get("ambientes", {}) or {}
+              for a, datos in amb.items():
+                  url = (datos or {}).get("url")
+                  if url and not str(url).startswith("https://"):
+                      errores.append(f"componente '{c.get('nombre')}' ({a}): la url debe ser https://")
+              comps.append({
+                  "nombre": c["nombre"],
+                  "ruta": c.get("ruta", "./"),
+                  "stack": c.get("stack", "node"),
+                  "proveedor": c.get("proveedor", "ninguno"),
+                  "staging": amb.get("staging", {}) or {},
+                  "production": amb.get("production", {}) or {},
+              })
+          seg = m.get("seguridad", {}) or {}
+          bloquear = seg.get("bloquear_en", ["CRITICAL", "HIGH"]) or []
+          for req in ("CRITICAL", "HIGH"):
+              if req not in bloquear:
+                  errores.append(f"seguridad.bloquear_en debe contener {req}")
+          hoy = dt.date.today()
+          for e in seg.get("excepciones", []) or []:
+              vence = e.get("vence")
+              if not isinstance(vence, dt.date):
+                  vence = dt.date.fromisoformat(str(vence))
+              if vence < hoy:
+                  print(f"::warning::Excepción vencida descartada: {e.get('id')} ({e.get('herramienta')}, venció {vence})")
+          # Modo B0: transición con fecha límite (aviso 30 días, fallo 45)
+          if m.get("modo") == "B0":
+              fecha = m.get("fecha_modo")
+              if not fecha:
+                  errores.append("modo B0 exige fecha_modo (fecha de entrada al modo)")
+              else:
+                  if not isinstance(fecha, dt.date):
+                      fecha = dt.date.fromisoformat(str(fecha))
+                  dias = (hoy - fecha).days
+                  if dias >= 45:
+                      errores.append(f"Modo B0 lleva {dias} días (máximo 45): migre a Modo B o vuelva a público")
+                  elif dias >= 30:
+                      print(f"::warning::Modo B0 lleva {dias} días; planifique la salida antes de los 45")
+          if errores:
+              for e in errores:
+                  print(f"::error::{e}")
+              sys.exit(1)
+          es_prod = os.environ["ES_PROD"].strip() == "true"
+          ambiente = "production" if es_prod else "staging"
+          desplegables = [c for c in comps if c["proveedor"] != "ninguno"]
+          def urls(amb):
+              return [{"nombre": c["nombre"], "url": c[amb]["url"]}
+                      for c in comps if c[amb].get("url")]
+          salida = {
+              "componentes": json.dumps(comps),
+              "desplegables": json.dumps(desplegables),
+              "hay_desplegables": str(bool(desplegables)).lower(),
+              "urls_staging": json.dumps(urls("staging")),
+              "urls_production": json.dumps(urls("production")),
+              "hay_dast": str(bool(seg.get("dast", True)) and bool(urls("staging"))).lower(),
+              "cobertura_minima": str(m.get("cobertura_minima", 70)),
+              "bloquear_en": ",".join(bloquear),
+              "zap_reglas": seg.get("zap_reglas", ".github/zap-rules.tsv"),
+              "ambiente": ambiente,
+              "es_produccion": str(es_prod).lower(),
+          }
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              for k, v in salida.items():
+                  out.write(f"{k}={v}\n")
+          print(json.dumps(salida, indent=2, ensure_ascii=False))
+          PY
+
+  # ---------------------------------------------------------------------------
+  # Fase 1 — calidad por componente (matriz). Pasos condicionados por stack.
+  # ---------------------------------------------------------------------------
+  calidad:
+    name: calidad (${{ matrix.componente.nombre }})
+    needs: preparar
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        componente: ${{ fromJson(needs.preparar.outputs.componentes) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.componente.ruta }}
+    env:
+      COVERAGE_MIN: ${{ needs.preparar.outputs.cobertura_minima }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # En workflow_dispatch se analiza/despliega el tag aprobado (D3)
+          ref: ${{ inputs.tag || github.ref }}
+
+      # ---- node --------------------------------------------------------------
+      - name: Node.js
+        if: matrix.componente.stack == 'node'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: ${{ vars.NODE_VERSION || '22' }}
+      - name: Lint + pruebas (node)
+        if: matrix.componente.stack == 'node'
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+        run: |
+          set -euo pipefail
+          # pnpm con ignore-scripts=true (.npmrc): política del equipo contra
+          # ataques de cadena de suministro. Nunca `npm install`.
+          corepack enable
+          corepack pnpm install --frozen-lockfile
+          corepack pnpm run lint
+          corepack pnpm test -- --run --coverage --coverage.reporter=text --coverage.reporter=json-summary
+          if [[ -f coverage/coverage-summary.json ]]; then
+            pct=$(jq -r '.total.lines.pct' coverage/coverage-summary.json)
+            echo "Cobertura: $pct % (mínimo $COVERAGE_MIN %)"
+            (( $(echo "$pct < $COVERAGE_MIN" | bc -l) )) && { echo "::error::Cobertura insuficiente"; exit 1; }
+          fi
+          if jq -e '.scripts["test:rules"]' package.json >/dev/null; then
+            npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" emulators:exec --only firestore \
+              --project demo-pruebas "npm run test:rules"
+          fi
+
+      # ---- python ------------------------------------------------------------
+      - name: Python
+        if: matrix.componente.stack == 'python'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ vars.PYTHON_VERSION || '3.12' }}
+      - name: uv
+        if: matrix.componente.stack == 'python'
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: ${{ matrix.componente.ruta }}/uv.lock
+      - name: Ruff + mypy + pytest + pip-audit (python)
+        if: matrix.componente.stack == 'python'
+        run: |
+          set -euo pipefail
+          # `--frozen` instala exactamente lo que fija uv.lock: si el lockfile no
+          # concuerda con el pyproject, falla en lugar de resolver por su cuenta.
+          uv sync --frozen --extra dev
+          uv run ruff check src tests
+          uv run ruff format --check src tests
+          # La verificación estricta de tipos es un control, no una sugerencia:
+          # el dominio de la evidencia es de tipado estricto (CLAUDE.md).
+          uv run mypy src
+          uv run pytest --cov=src --cov-report=term --cov-fail-under="$COVERAGE_MIN" -q
+          uv run --with pip-audit pip-audit --strict
+
+      # ---- terraform ---------------------------------------------------------
+      - name: Terraform
+        if: matrix.componente.stack == 'terraform'
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+        with:
+          terraform_version: ${{ vars.TERRAFORM_VERSION || '~> 1.13' }}
+          terraform_wrapper: false
+      - name: fmt + validate (terraform)
+        if: matrix.componente.stack == 'terraform'
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false && terraform validate
+
+      # ---- static --------------------------------------------------------------
+      # Un componente `static` no tiene suite de pruebas, pero sí puede tener
+      # lint y verificación de tipos. Se ejecutan cuando el paquete los declara,
+      # para que un prototipo no quede completamente fuera de todo control.
+      - name: Lint + tipos (static con package.json)
+        if: matrix.componente.stack == 'static' && hashFiles(format('{0}/package.json', matrix.componente.ruta)) != ''
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack pnpm install --frozen-lockfile
+          corepack pnpm run lint
+          corepack pnpm run typecheck
+
+      # ---- docker --------------------------------------------------------------
+      - name: Hadolint (docker)
+        if: matrix.componente.stack == 'docker'
+        run: docker run --rm -i hadolint/hadolint:v2.14.0 hadolint --failure-threshold warning - < Dockerfile
+
+  # ---------------------------------------------------------------------------
+  # Fase 2 — seguridad-estatica por componente (reusable con matriz).
+  # ---------------------------------------------------------------------------
+  seguridad-estatica:
+    name: seguridad-estatica (${{ matrix.componente.nombre }})
+    needs: preparar
+    strategy:
+      fail-fast: false
+      matrix:
+        componente: ${{ fromJson(needs.preparar.outputs.componentes) }}
+    permissions:
+      contents: read
+      # security-events: write solo lo usa el reusable cuando subir_sarif = true.
+      # Sin pull-requests: write: los escáneres no comentan en el PR.
+      security-events: write
+      actions: read
+    uses: ./.github/workflows/_reusable-security.yml
+    with:
+      ruta: ${{ matrix.componente.ruta }}
+      stack: ${{ matrix.componente.stack }}
+      bloquear_en: ${{ needs.preparar.outputs.bloquear_en }}
+      subir_sarif: ${{ github.event.repository.visibility == 'public' || vars.GHAS_ENABLED == 'true' }}
+      ref: ${{ inputs.tag || '' }}
+    # Se pasan solo los dos secretos que el reusable declara, en lugar de
+    # `secrets: inherit`: heredar entrega TODOS los secretos del repositorio
+    # —incluidas las credenciales de despliegue— a un workflow que solo necesita
+    # estos dos. Ambos son opcionales: si no existen, llegan vacíos.
+    secrets:
+      GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # Fase 3 — construir por componente. El resultado se publica como artifact
+  # `build-<nombre>` (dist/ para firebase; imagen.txt con la referencia por
+  # digest para cloudrun/ecs). Terraform/oci no construye nada aquí.
+  # ---------------------------------------------------------------------------
+  construir:
+    name: construir (${{ matrix.componente.nombre }})
+    needs: [preparar, calidad, seguridad-estatica]
+    if: needs.preparar.outputs.hay_desplegables == 'true' && github.event.pull_request.head.repo.fork != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        componente: ${{ fromJson(needs.preparar.outputs.desplegables) }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      APP_ENV: ${{ needs.preparar.outputs.ambiente }}
+      PUBLICAR: ${{ github.event_name != 'pull_request' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # En workflow_dispatch se analiza/despliega el tag aprobado (D3)
+          ref: ${{ inputs.tag || github.ref }}
+
+      # ---- firebase: build de la SPA ----------------------------------------
+      - name: Node.js
+        if: matrix.componente.proveedor == 'firebase'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: ${{ vars.NODE_VERSION || '22' }}
+          cache: npm
+          cache-dependency-path: ${{ matrix.componente.ruta }}/package-lock.json
+      - name: Build (firebase)
+        if: matrix.componente.proveedor == 'firebase'
+        working-directory: ${{ matrix.componente.ruta }}
+        run: |
+          npm ci
+          npm run build -- --mode "$APP_ENV"
+          mkdir -p "$GITHUB_WORKSPACE/salida" && cp -r dist "$GITHUB_WORKSPACE/salida/dist"
+
+      # ---- cloudrun: imagen → Artifact Registry -------------------------------
+      - name: Autenticar en GCP (WIF)
+        if: matrix.componente.proveedor == 'cloudrun' && env.PUBLICAR == 'true'
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_DEPLOY_STAGING }}
+          token_format: access_token
+      - name: Login en Artifact Registry
+        if: matrix.componente.proveedor == 'cloudrun' && env.PUBLICAR == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      # ---- ecs: imagen → ECR --------------------------------------------------
+      - name: Credenciales AWS (OIDC)
+        if: matrix.componente.proveedor == 'ecs' && env.PUBLICAR == 'true'
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_STAGING }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Login en ECR
+        if: matrix.componente.proveedor == 'ecs' && env.PUBLICAR == 'true'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2
+
+      # ---- contenedor (cloudrun | ecs) ---------------------------------------
+      - name: Nombre de imagen
+        if: matrix.componente.proveedor == 'cloudrun' || matrix.componente.proveedor == 'ecs'
+        id: nombre
+        env:
+          PROVEEDOR: ${{ matrix.componente.proveedor }}
+          NOMBRE: ${{ matrix.componente.nombre }}
+          # D4: `repositorio` del manifiesto con respaldo en vars
+          GAR: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ matrix.componente.staging.proyecto }}/${{ matrix.componente.staging.repositorio || vars.ARTIFACT_REGISTRY_REPO }}
+          ECR: ${{ steps.ecr.outputs.registry || 'local' }}/${{ matrix.componente.staging.repositorio || vars.ECR_REPOSITORY }}
+        run: |
+          if [[ "$PROVEEDOR" == "cloudrun" ]]; then base="$GAR/$NOMBRE"; else base="$ECR"; fi
+          echo "imagen=$base:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - name: Buildx
+        if: steps.nombre.outputs.imagen != ''
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+      - name: Build y push
+        if: steps.nombre.outputs.imagen != ''
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: ${{ matrix.componente.ruta }}
+          push: ${{ env.PUBLICAR == 'true' }}
+          load: ${{ env.PUBLICAR != 'true' }}
+          tags: ${{ steps.nombre.outputs.imagen }}
+          cache-from: type=gha,scope=${{ matrix.componente.nombre }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.componente.nombre }}
+          provenance: false
+      - name: Trivy image
+        if: steps.nombre.outputs.imagen != ''
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ steps.nombre.outputs.imagen }}
+          severity: ${{ needs.preparar.outputs.bloquear_en }}
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
+      - name: SBOM
+        if: steps.nombre.outputs.imagen != ''
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: ${{ steps.nombre.outputs.imagen }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.componente.nombre }}.spdx.json
+          artifact-name: sbom-${{ matrix.componente.nombre }}-${{ github.sha }}.spdx.json
+          upload-artifact: true
+      - name: cosign (firma keyless)
+        if: steps.nombre.outputs.imagen != '' && env.PUBLICAR == 'true'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Firmar y registrar referencia por digest
+        if: steps.nombre.outputs.imagen != '' && env.PUBLICAR == 'true'
+        env:
+          IMG: ${{ steps.nombre.outputs.imagen }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          ref="${IMG%%:*}@${DIGEST}"
+          cosign sign --yes "$ref"
+          mkdir -p salida && printf '%s' "$ref" > salida/imagen.txt
+          echo "Imagen: $ref"
+
+      - name: Publicar artifact del componente
+        if: env.PUBLICAR == 'true' || matrix.componente.proveedor == 'firebase'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: build-${{ matrix.componente.nombre }}
+          path: salida/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Fase 4 — desplegar-staging: matriz por componente desplegable; pasos
+  # condicionales por proveedor. Environment staging.
+  # ---------------------------------------------------------------------------
+  desplegar-staging:
+    name: desplegar-staging (${{ matrix.componente.nombre }} → ${{ matrix.componente.proveedor }})
+    needs: [preparar, construir]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.preparar.outputs.hay_desplegables == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        componente: ${{ fromJson(needs.preparar.outputs.desplegables) }}
+    environment:
+      name: staging
+      url: ${{ matrix.componente.staging.url }}
+    concurrency:
+      group: deploy-staging-${{ matrix.componente.nombre }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AMBIENTE: staging
+      PROYECTO: ${{ matrix.componente.staging.proyecto }}
+      SERVICIO: ${{ matrix.componente.staging.servicio || matrix.componente.nombre }}
+      REGION: ${{ matrix.componente.staging.region || vars.GCP_REGION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # En workflow_dispatch se analiza/despliega el tag aprobado (D3)
+          ref: ${{ inputs.tag || github.ref }}
+      - name: Descargar build del componente
+        if: matrix.componente.proveedor != 'oci'
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: build-${{ matrix.componente.nombre }}
+          path: salida
+
+      # ---- GCP (firebase | cloudrun) -----------------------------------------
+      - name: Autenticar en GCP (WIF)
+        if: matrix.componente.proveedor == 'firebase' || matrix.componente.proveedor == 'cloudrun'
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_DEPLOY_STAGING }}
+          token_format: access_token # docker login para cosign verify
+      - name: Login en Artifact Registry (lectura para verificar la firma)
+        if: matrix.componente.proveedor == 'cloudrun'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+      - name: Firebase Hosting + reglas (con copia previa para rollback)
+        if: matrix.componente.proveedor == 'firebase'
+        working-directory: ${{ matrix.componente.ruta }}
+        run: |
+          set -euo pipefail
+          rm -rf dist && cp -r "$GITHUB_WORKSPACE/salida/dist" dist
+          npm i -g "firebase-tools@${FIREBASE_TOOLS_VERSION}"
+          # D7: antes de CADA deploy a live se clona el contenido en vivo al
+          # canal "previa"; el rollback es clonar de vuelta previa → live.
+          firebase hosting:channel:create previa --project "$PROYECTO" --expires 30d --non-interactive >/dev/null 2>&1 || true
+          firebase hosting:clone "$SITE:live" "$SITE:previa" --project "$PROYECTO" || echo "::warning::Sin copia previa"
+          firebase deploy --only "${FIREBASE_DEPLOY_ONLY:-hosting,firestore:rules}" \
+            --project "$PROYECTO" --non-interactive --message "$AMBIENTE ${GITHUB_SHA::7}"
+        env:
+          FIREBASE_DEPLOY_ONLY: ${{ vars.FIREBASE_DEPLOY_ONLY }}
+          SITE: ${{ matrix.componente.staging.site || matrix.componente.staging.proyecto }}
+      - name: Leer referencia de imagen
+        if: matrix.componente.proveedor == 'cloudrun' || matrix.componente.proveedor == 'ecs'
+        id: img
+        run: echo "ref=$(cat salida/imagen.txt)" >> "$GITHUB_OUTPUT"
+      - name: Instalar cosign
+        if: matrix.componente.proveedor == 'cloudrun' || matrix.componente.proveedor == 'ecs'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Verificar firma de la imagen (cosign verify)
+        if: matrix.componente.proveedor == 'cloudrun'
+        env:
+          REF: ${{ steps.img.outputs.ref }}
+          REPO: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cosign verify \
+            --certificate-identity-regexp "^${REPO}/" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$REF"
+      - name: Cloud Run
+        if: matrix.componente.proveedor == 'cloudrun'
+        uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
+        with:
+          service: ${{ env.SERVICIO }}
+          region: ${{ env.REGION }}
+          project_id: ${{ env.PROYECTO }}
+          image: ${{ steps.img.outputs.ref }}
+          secrets: ${{ vars.CLOUD_RUN_SECRETS }}
+          env_vars: |
+            APP_ENV=staging
+            APP_VERSION=${{ github.sha }}
+          flags: --service-account=${{ vars.CLOUD_RUN_SA_STAGING }}
+
+      # ---- AWS (ecs) -----------------------------------------------------------
+      - name: Credenciales AWS (OIDC)
+        if: matrix.componente.proveedor == 'ecs'
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_STAGING }}
+          aws-region: ${{ matrix.componente.staging.region || vars.AWS_REGION }}
+      - name: Login en ECR (lectura para verificar la firma)
+        if: matrix.componente.proveedor == 'ecs'
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2
+      - name: Verificar firma de la imagen (cosign verify, ECS)
+        if: matrix.componente.proveedor == 'ecs'
+        env:
+          REF: ${{ steps.img.outputs.ref }}
+          REPO: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cosign verify \
+            --certificate-identity-regexp "^${REPO}/" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$REF"
+      - name: Renderizar task definition
+        if: matrix.componente.proveedor == 'ecs'
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@138c24f321fdbdf7edee4a685519d253cae2cdea # v1
+        with:
+          task-definition: ${{ matrix.componente.ruta }}/.aws/task-definition.json
+          container-name: ${{ env.SERVICIO }}
+          image: ${{ steps.img.outputs.ref }}
+          environment-variables: |
+            APP_ENV=staging
+      - name: ECS
+        if: matrix.componente.proveedor == 'ecs'
+        uses: aws-actions/amazon-ecs-deploy-task-definition@c465972ecbd160473f22e683363b422a5412a3de # v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: ${{ env.SERVICIO }}
+          cluster: ${{ matrix.componente.staging.cluster }}
+          wait-for-service-stability: true
+
+      # ---- OCI (terraform, API key; para OIDC ver ci-oci-terraform.yml) --------
+      - name: Terraform apply en OCI (staging)
+        if: matrix.componente.proveedor == 'oci'
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+        with:
+          terraform_version: ${{ vars.TERRAFORM_VERSION || '~> 1.13' }}
+          terraform_wrapper: false
+      - name: OCI credenciales + apply
+        if: matrix.componente.proveedor == 'oci'
+        working-directory: ${{ matrix.componente.ruta }}
+        env:
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCI_REGION: ${{ vars.OCI_REGION }}
+          TF_VAR_oci_auth: APIKey
+          # D4: clave `compartimento` del manifiesto, con respaldo en vars
+          TF_VAR_compartment_ocid: ${{ matrix.componente.staging.compartimento || vars.OCI_COMPARTMENT_OCID }}
+          TF_IN_AUTOMATION: 'true'
+          TF_INPUT: 'false'
+        run: |
+          set -euo pipefail
+          umask 077; mkdir -p ~/.oci
+          printf '%s\n' "$OCI_PRIVATE_KEY" > ~/.oci/api_key.pem
+          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s/.oci/api_key.pem\n' \
+            "$OCI_USER_OCID" "$OCI_FINGERPRINT" "$OCI_TENANCY_OCID" "$OCI_REGION" "$HOME" > ~/.oci/config
+          trap 'shred -u ~/.oci/* 2>/dev/null || rm -rf ~/.oci' EXIT
+          terraform init -lockfile=readonly
+          terraform plan -lock-timeout=5m -no-color -out=tfplan -var-file="$AMBIENTE.tfvars"
+          terraform apply -lock-timeout=5m -no-color tfplan
+
+  # ---------------------------------------------------------------------------
+  # Fase 5 — dast-y-humo por URL de staging declarada en el manifiesto.
+  # ---------------------------------------------------------------------------
+  dast-y-humo:
+    name: dast-y-humo (${{ matrix.objetivo.nombre }})
+    needs: [preparar, desplegar-staging]
+    if: needs.preparar.outputs.hay_dast == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        objetivo: ${{ fromJson(needs.preparar.outputs.urls_staging) }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_reusable-dast.yml
+    with:
+      url_objetivo: ${{ matrix.objetivo.url }}
+      reglas: ${{ needs.preparar.outputs.zap_reglas }}
+      escaneo_completo: false
+      ruta_salud: ${{ vars.HEALTH_PATH || '/healthz' }}
+
+  # ---------------------------------------------------------------------------
+  # Fase 6 — desplegar-produccion: misma estructura que staging con las
+  # credenciales/identificadores de producción y el Environment production.
+  # Cloud Run: sin tráfico + canary 10 % → 100 % (ver ci-python-cloudrun.yml).
+  # ---------------------------------------------------------------------------
+  desplegar-produccion:
+    name: desplegar-produccion (${{ matrix.componente.nombre }} → ${{ matrix.componente.proveedor }})
+    needs: [preparar, construir]
+    # D3: tag estable fuera de B0, o dispatch confirmado (la aprobación se
+    # verifica en el primer step del job).
+    if: >-
+      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+         && !contains(github.ref_name, '-') && vars.MODO != 'B0')
+       || (github.event_name == 'workflow_dispatch' && inputs.confirmar == 'DESPLEGAR'))
+      && needs.preparar.outputs.hay_desplegables == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        componente: ${{ fromJson(needs.preparar.outputs.desplegables) }}
+    environment:
+      name: production
+      url: ${{ matrix.componente.production.url }}
+    concurrency:
+      group: deploy-production-${{ matrix.componente.nombre }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AMBIENTE: production
+      PROYECTO: ${{ matrix.componente.production.proyecto }}
+      SERVICIO: ${{ matrix.componente.production.servicio || matrix.componente.nombre }}
+      REGION: ${{ matrix.componente.production.region || vars.GCP_REGION }}
+      URL: ${{ matrix.componente.production.url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # En workflow_dispatch se analiza/despliega el tag aprobado (D3)
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0 # historial y tags completos para verificar la aprobación
+
+      # D3 — Verificación de aprobación previa a producción (todos los modos).
+      - name: Verificar aprobación
+        env:
+          EVENTO: ${{ github.event_name }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+          ACTOR: ${{ github.actor }}
+          APROBADORES: ${{ vars.APROBADORES_PROD }}
+          FIRMA_REQUERIDA: ${{ vars.TAG_FIRMADO_REQUERIDO }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin main
+          if [[ "$EVENTO" == "workflow_dispatch" ]]; then
+            git rev-parse -q --verify "refs/tags/$TAG" >/dev/null \
+              || { echo "::error::El tag '$TAG' no existe en el repositorio"; exit 1; }
+            [[ "$TAG" != *-* ]] \
+              || { echo "::error::'$TAG' es un prerelease y no despliega producción"; exit 1; }
+            git merge-base --is-ancestor "$TAG" origin/main \
+              || { echo "::error::'$TAG' no es ancestro de origin/main"; exit 1; }
+            lista=",$(echo "$APROBADORES" | tr -d ' '),"
+            [[ "$lista" == *",$ACTOR,"* ]] \
+              || { echo "::error::'$ACTOR' no está en vars.APROBADORES_PROD"; exit 1; }
+            if [[ "$FIRMA_REQUERIDA" == "true" ]]; then
+              git tag -v "$TAG" \
+                || { echo "::error::El tag '$TAG' no tiene firma verificable (TAG_FIRMADO_REQUERIDO=true)"; exit 1; }
+            fi
+          else
+            git merge-base --is-ancestor "$TAG" origin/main \
+              || { echo "::error::El tag '$TAG' no es ancestro de origin/main"; exit 1; }
+            [[ "$TAG" != *-* ]] \
+              || { echo "::error::'$TAG' es un prerelease y no despliega producción"; exit 1; }
+          fi
+          echo "Aprobación verificada: $TAG por $ACTOR ($EVENTO)"
+
+      - name: Descargar build del componente
+        if: matrix.componente.proveedor != 'oci'
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: build-${{ matrix.componente.nombre }}
+          path: salida
+
+      # ---- GCP ------------------------------------------------------------------
+      - name: Autenticar en GCP (WIF, SA de producción)
+        if: matrix.componente.proveedor == 'firebase' || matrix.componente.proveedor == 'cloudrun'
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_DEPLOY_PROD }}
+          token_format: access_token # docker login para cosign verify
+      - name: Login en Artifact Registry (lectura para verificar la firma)
+        if: matrix.componente.proveedor == 'cloudrun'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+      - name: gcloud
+        if: matrix.componente.proveedor == 'cloudrun'
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+      - name: Firebase Hosting + reglas (con copia previa para rollback)
+        if: matrix.componente.proveedor == 'firebase'
+        working-directory: ${{ matrix.componente.ruta }}
+        env:
+          FIREBASE_DEPLOY_ONLY: ${{ vars.FIREBASE_DEPLOY_ONLY }}
+          # D4: clave `site` del manifiesto (solo multi-sitio); por defecto el proyecto
+          SITE: ${{ matrix.componente.production.site || matrix.componente.production.proyecto }}
+        run: |
+          set -euo pipefail
+          rm -rf dist && cp -r "$GITHUB_WORKSPACE/salida/dist" dist
+          npm i -g "firebase-tools@${FIREBASE_TOOLS_VERSION}"
+          # D7: copia de la versión en vivo al canal "previa" antes del deploy
+          firebase hosting:channel:create previa --project "$PROYECTO" --expires 30d --non-interactive >/dev/null 2>&1 || true
+          firebase hosting:clone "$SITE:live" "$SITE:previa" --project "$PROYECTO" || echo "::warning::Sin copia previa"
+          firebase deploy --only "${FIREBASE_DEPLOY_ONLY:-hosting,firestore:rules}" \
+            --project "$PROYECTO" --non-interactive --message "$AMBIENTE ${GITHUB_REF_NAME}"
+      - name: Leer referencia de imagen
+        if: matrix.componente.proveedor == 'cloudrun' || matrix.componente.proveedor == 'ecs'
+        id: img
+        run: echo "ref=$(cat salida/imagen.txt)" >> "$GITHUB_OUTPUT"
+      - name: Instalar cosign
+        if: matrix.componente.proveedor == 'cloudrun' || matrix.componente.proveedor == 'ecs'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Verificar firma de la imagen (cosign verify)
+        if: matrix.componente.proveedor == 'cloudrun'
+        env:
+          REF: ${{ steps.img.outputs.ref }}
+          REPO: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cosign verify \
+            --certificate-identity-regexp "^${REPO}/" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$REF"
+      - name: Cloud Run (sin tráfico)
+        if: matrix.componente.proveedor == 'cloudrun'
+        uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
+        with:
+          service: ${{ env.SERVICIO }}
+          region: ${{ env.REGION }}
+          project_id: ${{ env.PROYECTO }}
+          image: ${{ steps.img.outputs.ref }}
+          secrets: ${{ vars.CLOUD_RUN_SECRETS }}
+          env_vars: |
+            APP_ENV=production
+            APP_VERSION=${{ github.ref_name }}
+          no_traffic: true
+          flags: --service-account=${{ vars.CLOUD_RUN_SA_PROD }}
+      - name: Cloud Run canary 10 % → salud → 100 % (rollback si falla)
+        if: matrix.componente.proveedor == 'cloudrun'
+        run: |
+          set -euo pipefail
+          describir() { gcloud run services describe "$SERVICIO" --region "$REGION" --project "$PROYECTO" --format="value($1)"; }
+          nueva=$(describir status.latestCreatedRevisionName)
+          anterior=$(gcloud run services describe "$SERVICIO" --region "$REGION" --project "$PROYECTO" \
+                     --format='value(status.traffic[0].revisionName)')
+          if [[ -z "$anterior" || "$anterior" == "$nueva" ]]; then
+            gcloud run services update-traffic "$SERVICIO" --region "$REGION" --project "$PROYECTO" --to-latest; exit 0
+          fi
+          gcloud run services update-traffic "$SERVICIO" --region "$REGION" --project "$PROYECTO" --to-revisions="$nueva=10,$anterior=90"
+          fallos=0
+          for _ in $(seq 1 12); do
+            c=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "${URL%/}${HEALTH_PATH:-/healthz}" || echo 000)
+            [[ "$c" == "200" ]] || fallos=$((fallos+1)); sleep 10
+          done
+          if (( fallos > 2 )); then
+            gcloud run services update-traffic "$SERVICIO" --region "$REGION" --project "$PROYECTO" --to-revisions="$anterior=100"
+            echo "::error::Canary insalubre; tráfico devuelto a $anterior"; exit 1
+          fi
+          gcloud run services update-traffic "$SERVICIO" --region "$REGION" --project "$PROYECTO" --to-latest
+        env:
+          HEALTH_PATH: ${{ vars.HEALTH_PATH }}
+
+      # ---- AWS ------------------------------------------------------------------
+      - name: Credenciales AWS (OIDC, rol de producción)
+        if: matrix.componente.proveedor == 'ecs'
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ matrix.componente.production.region || vars.AWS_REGION }}
+      - name: Login en ECR (lectura para verificar la firma)
+        if: matrix.componente.proveedor == 'ecs'
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2
+      - name: Verificar firma de la imagen (cosign verify, ECS)
+        if: matrix.componente.proveedor == 'ecs'
+        env:
+          REF: ${{ steps.img.outputs.ref }}
+          REPO: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cosign verify \
+            --certificate-identity-regexp "^${REPO}/" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$REF"
+      - name: Renderizar task definition
+        if: matrix.componente.proveedor == 'ecs'
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@138c24f321fdbdf7edee4a685519d253cae2cdea # v1
+        with:
+          task-definition: ${{ matrix.componente.ruta }}/.aws/task-definition.json
+          container-name: ${{ env.SERVICIO }}
+          image: ${{ steps.img.outputs.ref }}
+          environment-variables: |
+            APP_ENV=production
+      - name: ECS (con circuit breaker configurado en el servicio)
+        if: matrix.componente.proveedor == 'ecs'
+        uses: aws-actions/amazon-ecs-deploy-task-definition@c465972ecbd160473f22e683363b422a5412a3de # v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: ${{ env.SERVICIO }}
+          cluster: ${{ matrix.componente.production.cluster }}
+          wait-for-service-stability: true
+          wait-for-minutes: 20
+
+      # ---- OCI ------------------------------------------------------------------
+      - name: Terraform
+        if: matrix.componente.proveedor == 'oci'
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+        with:
+          terraform_version: ${{ vars.TERRAFORM_VERSION || '~> 1.13' }}
+          terraform_wrapper: false
+      - name: OCI credenciales + apply (producción)
+        if: matrix.componente.proveedor == 'oci'
+        working-directory: ${{ matrix.componente.ruta }}
+        env:
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCI_REGION: ${{ vars.OCI_REGION }}
+          TF_VAR_oci_auth: APIKey
+          # D4: clave `compartimento` del manifiesto, con respaldo en vars
+          TF_VAR_compartment_ocid: ${{ matrix.componente.production.compartimento || vars.OCI_COMPARTMENT_OCID }}
+          TF_IN_AUTOMATION: 'true'
+          TF_INPUT: 'false'
+        run: |
+          set -euo pipefail
+          umask 077; mkdir -p ~/.oci
+          printf '%s\n' "$OCI_PRIVATE_KEY" > ~/.oci/api_key.pem
+          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s/.oci/api_key.pem\n' \
+            "$OCI_USER_OCID" "$OCI_FINGERPRINT" "$OCI_TENANCY_OCID" "$OCI_REGION" "$HOME" > ~/.oci/config
+          trap 'shred -u ~/.oci/* 2>/dev/null || rm -rf ~/.oci' EXIT
+          terraform init -lockfile=readonly
+          terraform plan -lock-timeout=5m -no-color -out=tfplan -var-file="$AMBIENTE.tfvars"
+          terraform apply -lock-timeout=5m -no-color tfplan
+
+  # ---------------------------------------------------------------------------
+  # Fase 7 — post-despliegue: health check de cada URL de producción y registro.
+  # El rollback automático por proveedor está en los pasos de producción
+  # (Cloud Run) o en los workflows específicos (Firebase canal previa, ECS task
+  # definition anterior). Ver 01-seguridad/06-rollback-e-incidentes.md.
+  # ---------------------------------------------------------------------------
+  post-despliegue:
+    name: post-despliegue (${{ matrix.objetivo.nombre }})
+    needs: [preparar, desplegar-produccion]
+    if: needs.preparar.outputs.es_produccion == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        objetivo: ${{ fromJson(needs.preparar.outputs.urls_production) }}
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Health check (10 intentos, 15 s)
+        id: salud
+        env:
+          URL: ${{ matrix.objetivo.url }}
+          RUTA_SALUD: ${{ vars.HEALTH_PATH || '/healthz' }}
+        run: |
+          set -uo pipefail
+          for i in $(seq 1 10); do
+            c=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 -L "${URL%/}${RUTA_SALUD}" || echo 000)
+            # Un frontend estático puede no exponer /healthz: si la ruta de
+            # salud devuelve 404 se acepta / con 200.
+            if [[ "$c" == "404" ]]; then
+              c=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 -L "${URL%/}/" || echo 000)
+            fi
+            [[ "$c" == "200" ]] && { echo "ok=true" >> "$GITHUB_OUTPUT"; exit 0; }
+            echo "Intento $i: $c"; sleep 15
+          done
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          echo "::error::$URL no responde 200. Ejecute el rollback del proveedor (06-rollback-e-incidentes.md)"
+
+      - name: Registrar Deployment
+        if: always()
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          SALUD_OK: ${{ steps.salud.outputs.ok }}
+          URL_PROD: ${{ matrix.objetivo.url }}
+          NOMBRE: ${{ matrix.objetivo.nombre }}
+        with:
+          script: |
+            const ok = process.env.SALUD_OK === 'true';
+            const { data: d } = await github.rest.repos.createDeployment({
+              owner: context.repo.owner, repo: context.repo.repo, ref: context.ref,
+              environment: 'production', auto_merge: false, required_contexts: [],
+              task: `deploy:${process.env.NOMBRE}`, description: `Componente ${process.env.NOMBRE}`
+            });
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner, repo: context.repo.repo, deployment_id: d.id,
+              state: ok ? 'success' : 'failure', environment_url: process.env.URL_PROD,
+              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+            if (!ok) core.setFailed(`Health check fallido: ${process.env.NOMBRE}`);
+
+  # ---------------------------------------------------------------------------
+  # compuerta-pr (D1): ÚNICO status check que exigen los rulesets de main. Los
+  # jobs con matriz reportan contextos con sufijo («calidad (web)»); este job
+  # los agrega en un solo contexto estable.
+  # ---------------------------------------------------------------------------
+  compuerta-pr:
+    name: compuerta-pr
+    needs: [calidad, seguridad-estatica]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verificar resultados de calidad y seguridad-estatica
+        env:
+          R_CALIDAD: ${{ needs.calidad.result }}
+          R_SEGURIDAD: ${{ needs.seguridad-estatica.result }}
+        run: |
+          set -euo pipefail
+          echo "calidad=$R_CALIDAD | seguridad-estatica=$R_SEGURIDAD"
+          for r in "$R_CALIDAD" "$R_SEGURIDAD"; do
+            if [[ "$r" != "success" ]]; then
+              echo "::error::compuerta-pr bloqueada: algún job requerido no terminó en success"
+              exit 1
+            fi
+          done
+          echo "compuerta-pr: aprobada"

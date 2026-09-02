@@ -111,7 +111,8 @@ todavía y la fase que las cubre es parte del trabajo, no un extra.**
    en respuestas de API, ni en el acta. En modo `TENANT_VERIFIED` el tenant envía la
    referencia del OTP, jamás el código.
    → `test_audit_trail_model.py::test_rechaza_hash_de_otp_que_no_sea_sha256`,
-   `::test_rechaza_otp_verificado_antes_de_enviarse`
+   `::test_rechaza_otp_verificado_antes_de_enviarse`,
+   `test_api_http.py::test_el_codigo_otp_no_vuelve_en_la_respuesta`
 
 2. **Atomicidad del acto de firma.** Una transacción se firma entera o no se firma. No existe
    el estado en que una parte quedó firmada y otra no, y una confirmación repetida devuelve
@@ -131,7 +132,8 @@ todavía y la fase que las cubre es parte del trabajo, no un extra.**
 5. **Evidencia append-only.** Nunca se sobrescribe ni se borra un registro. Una corrección
    escribe `METADATA#V{n+1}`; el repositorio no expone borrado ni actualización, y la
    escritura lleva `attribute_not_exists` para que la evidencia no se pise.
-   → cubierto por construcción en `dynamo_audit.py`; **falta el test explícito** (fase 5)
+   → `test_repositorios.py::test_no_sobrescribe_una_version_existente`,
+   `::test_una_correccion_crea_una_version_nueva`
 
 ### Aislamiento multi-tenant
 
@@ -139,7 +141,9 @@ todavía y la fase que las cubre es parte del trabajo, no un extra.**
    comprobación vive en el repositorio, no solo en HTTP: un error de enrutamiento no puede
    convertirse en una fuga entre tenants. No se expone ninguna operación de `Scan`.
    → `test_security.py::test_contexto_bloquea_acceso_cruzado_entre_inquilinos`,
-   `test_signing_flow.py::test_otro_inquilino_no_accede_a_la_transaccion`
+   `test_signing_flow.py::test_otro_inquilino_no_accede_a_la_transaccion`,
+   `test_repositorios.py::test_no_se_puede_leer_la_transaccion_de_otro_inquilino`,
+   `test_api_http.py::test_el_inquilino_sale_de_la_credencial_y_no_del_cuerpo`
 
 7. **Una operación sobre el tenant A no puede alcanzar la clave de KMS del tenant B.**
    → **PENDIENTE** (fase 4, con `moto`/LocalStack)
@@ -239,6 +243,67 @@ Un servicio que firma documentos con valor jurídico no arranca con parámetros 
 
 ---
 
+## Estándar DevSecOps v2
+
+El repositorio aplica el estándar de `~/SeguridadGeneral` en **modo A** (público), stack
+`multicloud` (tres componentes: `signer`, `infra`, `dashboard`). El manifiesto es
+`.devsecops.yml` y el pipeline es `.github/workflows/ci-multicloud.yml`, con las ocho fases
+fijas más el job agregador `compuerta-pr`.
+
+### Reglas obligatorias antes de dar por terminada cualquier tarea
+
+1. **Pruebas en verde**: ejecute la suite completa; si añade funcionalidad, añada pruebas.
+   No marque una tarea como terminada con pruebas fallando o saltadas.
+2. **`./security-local.sh` sin CRITICAL ni HIGH** no exceptuados. Si faltan herramientas,
+   indíquelo explícitamente: **un análisis vacío no equivale a un análisis limpio.**
+3. **Conventional Commits** (`feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`,
+   `build`, `ci`, `chore`, `security`, `revert`), descripción en español. Un cambio por
+   commit; sin `--no-verify`.
+4. **Nunca confirme secretos**: ni `.env`, ni claves, ni JSON de cuentas de servicio, ni
+   tokens en código o workflows. Se referencian por nombre, nunca por valor. Si detecta uno
+   en el historial, deténgase e informe.
+5. **Nunca degrade reglas de seguridad de datos ni de IAM**: políticas de clave de KMS,
+   políticas IAM, trust policies OIDC. Ampliar permisos exige justificación escrita en el PR
+   y aprobación del propietario.
+6. **Nunca despliegue a producción** ni cree el tag `vX.Y.Z` sin instrucción explícita de una
+   persona. Prepare el pase y entregue los comandos para que los ejecute quien corresponda.
+7. **No desactive controles**: no comente pasos de workflows, no añada `continue-on-error`,
+   no relaje `bloquear_en`, no cree archivos de ignorado para ocultar hallazgos. Las
+   excepciones van solo en `seguridad.excepciones` de `.devsecops.yml`, con `vence`, y las
+   aprueba el propietario.
+8. **Acciones fijadas por SHA** con comentario de versión en todo workflow que edite. **El
+   SHA se verifica contra el repositorio de la acción antes de escribirlo** (`gh api
+   repos/<owner>/<repo>/git/refs/tags/<tag>`): un SHA inventado no fija nada, rompe el
+   workflow y es indistinguible de un error tipográfico en la revisión.
+9. **Revise el diff antes de proponer el commit** (`git diff --cached`) y use
+   `.github/PULL_REQUEST_TEMPLATE.md` al abrir PRs.
+
+### Ante un hallazgo de seguridad
+
+Lea `.security-reports/ultimo/resumen.md` y clasifique por severidad.
+
+* **CRITICAL/HIGH:** corrija en la misma rama antes de continuar. Si es una dependencia,
+  actualice a la versión con corrección; **si no hay corrección disponible**, documente el
+  análisis y proponga una excepción con `id`, `herramienta`, `componente`, `justificacion`,
+  `aprobado_por`, `creado` y `vence` (máximo 90 días).
+* **MEDIUM:** corrija si el costo es bajo; si no, regístrelo con fecha de compromiso.
+* **Secreto detectado:** no lo borre en silencio. Informe, rote la credencial y después
+  limpie el historial.
+* **Falso positivo:** justifíquelo con evidencia concreta en la excepción, **nunca editando
+  la configuración del escáner para silenciar la regla completa**. La excepción a esto son
+  los patrones de exclusión de directorios que nunca deben analizarse (`.venv`,
+  `node_modules`), que no ocultan hallazgos del proyecto sino de sus dependencias.
+
+Documentación del estándar: `~/SeguridadGeneral/00-gobernanza/` (política, convenciones,
+flujo git, modos y aprobaciones), `01-seguridad/` (secretos, OIDC, hardening, checklist de
+pase a producción, rollback) y `02-pipelines/` (workflows y configuración de escáneres).
+
+Subagentes en `.claude/agents/`: `devsecops`, `seguridad` (solo lectura), `deploy` (no puede
+desplegar a producción) y `proyectos` (solo lectura). Skills: `/aplicar-estandar-devsecops` y
+`/pase-a-produccion`.
+
+---
+
 ## Checklist antes de cerrar una tarea
 
 Además de `make test` en verde:
@@ -255,6 +320,8 @@ Además de `make test` en verde:
 7. Si cambia el contrato público: ¿se actualizó `api/openapi.yaml`, el SDK y los tests de
    contrato? ¿el cambio es compatible hacia atrás para los tenants existentes?
 8. Si algo quedó sin resolver, ¿está en `docs/PENDIENTES.md` en lugar de simulado en silencio?
+9. ¿`./security-local.sh` termina sin CRITICAL ni HIGH no exceptuados, con las cinco
+   herramientas disponibles?
 
 ---
 
