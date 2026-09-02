@@ -72,20 +72,6 @@ seguridad:
       aprobado_por: segurolotengopy
       creado: "2026-09-02"
       vence: "2026-12-02"
-    - id: AWS-0104
-      herramienta: trivy
-      componente: infra
-      justificacion: >-
-        El grupo de seguridad del motor de firma permite salida a 0.0.0.0/0 en el
-        puerto 443 únicamente. El servicio necesita alcanzar la TSA cualificada,
-        cuyo rango de direcciones se conocerá al contratarla (B-01 de
-        docs/PENDIENTES.md), y los servicios de AWS. La corrección definitiva son
-        los VPC endpoints para los servicios de AWS más un egreso restringido al
-        rango de la TSA, y se aborda en la fase de infraestructura. No hay
-        infraestructura desplegada, de modo que hoy el hallazgo no tiene exposición.
-      aprobado_por: segurolotengopy
-      creado: "2026-09-02"
-      vence: "2026-12-02"
     - id: CKV_AWS_68
       herramienta: checkov
       componente: infra

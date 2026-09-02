@@ -131,12 +131,36 @@ resource "aws_security_group" "service" {
     security_groups = [var.load_balancer_security_group_id]
   }
 
+  # El egreso se declara por destino y no como «todo el puerto 443». Un servicio
+  # que firma documentos con valor jurídico solo necesita alcanzar tres cosas: los
+  # servicios de AWS que usa, la autoridad de sellado de tiempo y el proveedor de
+  # identidad del inquilino. Todo lo demás que pudiera salir por 443 —una
+  # exfiltración desde el contenedor, por ejemplo— no tiene por qué poder hacerlo.
+  #
+  # Los servicios de AWS se alcanzan por sus listas de prefijos gestionadas, que
+  # AWS mantiene al día: fijar sus rangos a mano quedaría desactualizado.
   egress {
-    description = "Salida HTTPS hacia servicios AWS y TSA cualificada"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    description     = "Servicios de AWS por sus listas de prefijos gestionadas"
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    prefix_list_ids = var.aws_service_prefix_list_ids
+  }
+
+  dynamic "egress" {
+    # La autoridad de sellado y el proveedor de identidad se declaran por su
+    # rango. Mientras la TSA no esté contratada (B-01 de docs/PENDIENTES.md), la
+    # lista está vacía y el nivel 2 no puede operar — que es exactamente lo que
+    # el ADR-0007 declara.
+    for_each = length(var.external_https_cidr_blocks) > 0 ? [1] : []
+
+    content {
+      description = "Autoridad de sellado de tiempo y proveedor de identidad"
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      cidr_blocks = var.external_https_cidr_blocks
+    }
   }
 
   tags = var.tags
