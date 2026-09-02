@@ -238,4 +238,19 @@ describe("FncClient — comportamiento propio del cliente", () => {
 
     expect(registro[0]?.ruta).toBe("/v1/transactions");
   });
+
+  it("normaliza la URL base con varias barras finales", async () => {
+    // El recorte se hace con un recorrido y no con un cuantificador anclado al
+    // final, que costaría tiempo cuadrático sobre una cadena así.
+    const client = new FncClient({
+      baseUrl: "https://api.fnc.invalid///////",
+      tenantId: "t",
+      signer: { sign: async () => "f" },
+      fetch: crearServicioFalso(registro),
+    });
+
+    await client.createTransaction(buildSampleRequest(), "k-url-barras");
+
+    expect(registro[0]?.ruta).toBe("/v1/transactions");
+  });
 });
