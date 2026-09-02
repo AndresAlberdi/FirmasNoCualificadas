@@ -1,0 +1,1151 @@
+# Generado por scripts/exportar-openapi.py — no editar a mano.
+# Regenerar con `make openapi` al cambiar el contrato.
+openapi: 3.1.0
+info:
+  title: PSCNC · API de Firma Electrónica No Cualificada
+  description: 'Contrato público de FirmasNoCualificadas.
+
+
+    Reglas que un integrador debe conocer antes de programar:
+
+
+    - La decisión de identidad llega **tomada por el tenant**; el servicio la asienta como evidencia y
+    no la revisa.
+
+    - El OTP verificado por el tenant viaja como prueba, nunca el código.
+
+    - El modo predeterminado es *hash-only*: el documento no se envía.
+
+    - Las escrituras exigen `Idempotency-Key`; una confirmación repetida devuelve el acta original.
+
+    - Todo rechazo trae un `motivo` de un enumerado estable, nunca un mensaje libre.'
+  version: 0.1.0
+paths:
+  /v1/transactions:
+    post:
+      tags:
+      - transacciones
+      summary: Crear Transaccion
+      description: 'Abre una transacción de firma.
+
+
+        La decisión de identidad llega tomada por el tenant y se asienta como
+
+        evidencia; FNC no la revisa (ADR-0009).'
+      operationId: crear_transaccion_v1_transactions_post
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Idempotency-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTransactionRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionCreated'
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflict
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Forbidden
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/transactions/{transaction_id}/confirm:
+    post:
+      tags:
+      - transacciones
+      summary: Confirmar Transaccion
+      description: 'Confirma el acto y devuelve el acta sellada.
+
+
+        Una confirmación repetida con la misma clave devuelve **el acta original**.'
+      operationId: confirmar_transaccion_v1_transactions__transaction_id__confirm_post
+      parameters:
+      - name: transaction_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Transaction Id
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Idempotency-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmTransactionRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionConfirmed'
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflict
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unprocessable Entity
+  /v1/transactions/{transaction_id}/artifacts:
+    get:
+      tags:
+      - transacciones
+      summary: Obtener Artefactos
+      description: Recupera el acta sellada y el código de verificación.
+      operationId: obtener_artefactos_v1_transactions__transaction_id__artifacts_get
+      parameters:
+      - name: transaction_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Transaction Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artifacts'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not Found
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Forbidden
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/verify/{code}:
+    get:
+      tags:
+      - transacciones
+      - verificación
+      summary: Verificar Publicamente
+      description: 'Constancia pública de un acto de firma. **Sin autenticación.**
+
+
+        La consulta quien recibió el documento, que no tiene credenciales. No devuelve
+
+        ningún dato personal: confirma que el acto existe, sobre qué documento y bajo
+
+        qué norma. Un código inexistente y uno no confirmado responden igual, para que
+
+        quien prueba códigos al azar no pueda averiguar cuáles existen.'
+      operationId: verificar_publicamente_v1_verify__code__get
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Code
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicVerification'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /.well-known/fnc-keys.json:
+    get:
+      tags:
+      - verificación
+      summary: Claves Publicas De Sello
+      description: 'Claves públicas con las que se verifica el sello de las actas (RFC 7517).
+
+
+        Es un endpoint **público y sin autenticación**, y tiene que serlo: el acta
+
+        sellada solo sirve como prueba si un tercero —el inquilino, su asesoría legal,
+
+        un perito— puede verificarla sin pedirnos acceso. Un sello que solo nosotros
+
+        sabemos comprobar no traslada confianza, la concentra.
+
+
+        Publica únicamente material público. La clave privada no puede salir del HSM
+
+        ni aunque quisiéramos (ADR-0006).'
+      operationId: claves_publicas_de_sello__well_known_fnc_keys_json_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /health:
+    get:
+      tags:
+      - operación
+      summary: Health
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /v1/signing-sessions:
+    post:
+      tags:
+      - firma
+      summary: Crear Sesion
+      description: Inicia una sesión de firma vinculada a un onboarding aprobado.
+      operationId: crear_sesion_v1_signing_sessions_post
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_crear_sesion_v1_signing_sessions_post'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SigningSessionCreated'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/signing-sessions/{session_id}/confirm:
+    post:
+      tags:
+      - firma
+      summary: Confirmar Firma
+      description: Verifica el consentimiento y aplica la firma PAdES-B-T con sello de tiempo.
+      operationId: confirmar_firma_v1_signing_sessions__session_id__confirm_post
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Session Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmSignatureRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SigningSessionCompleted'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/signing-sessions/{session_id}/evidence:
+    get:
+      tags:
+      - evidencia
+      summary: Obtener Evidencia
+      description: Entrega el expediente de evidencias y el documento firmado (URLs temporales).
+      operationId: obtener_evidencia_v1_signing_sessions__session_id__evidence_get
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Session Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceBundle'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    ActaSeal:
+      properties:
+        jws:
+          type: string
+          title: Jws
+        payload_sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          title: Payload Sha256
+        key_alias:
+          type: string
+          title: Key Alias
+        algorithm:
+          type: string
+          title: Algorithm
+          default: ES256
+        jwks_url:
+          type: string
+          title: Jwks Url
+          default: /.well-known/fnc-keys.json
+      additionalProperties: false
+      type: object
+      required:
+      - jws
+      - payload_sha256
+      - key_alias
+      title: ActaSeal
+      description: Datos con los que un tercero verifica el acta.
+    Artifacts:
+      properties:
+        transaction_id:
+          type: string
+          title: Transaction Id
+        status:
+          $ref: '#/components/schemas/TransactionStatus'
+        service_level:
+          $ref: '#/components/schemas/ServiceLevel'
+        acta:
+          anyOf:
+          - $ref: '#/components/schemas/ActaSeal'
+          - type: 'null'
+        verification_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Verification Code
+        signed_document_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Signed Document Url
+        url_expires_in_seconds:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Url Expires In Seconds
+      additionalProperties: false
+      type: object
+      required:
+      - transaction_id
+      - status
+      - service_level
+      title: Artifacts
+      description: Respuesta de `GET /v1/transactions/{id}/artifacts`.
+    Body_crear_sesion_v1_signing_sessions_post:
+      properties:
+        onboarding_token:
+          type: string
+          title: Onboarding Token
+        pdf_document:
+          type: string
+          contentMediaType: application/octet-stream
+          title: Pdf Document
+        metadata:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Metadata
+      type: object
+      required:
+      - onboarding_token
+      - pdf_document
+      title: Body_crear_sesion_v1_signing_sessions_post
+    ConfirmSignatureRequest:
+      properties:
+        consent_otp_code:
+          type: string
+          maxLength: 10
+          minLength: 4
+          pattern: ^[0-9]+$
+          title: Consent Otp Code
+        consent_statement:
+          type: string
+          maxLength: 4000
+          minLength: 1
+          title: Consent Statement
+        visual_signature_enabled:
+          type: boolean
+          title: Visual Signature Enabled
+          default: true
+        signature_page:
+          type: integer
+          minimum: 1.0
+          title: Signature Page
+          default: 1
+        signature_coordinate_x:
+          type: number
+          minimum: 0.0
+          title: Signature Coordinate X
+          default: 100.0
+        signature_coordinate_y:
+          type: number
+          minimum: 0.0
+          title: Signature Coordinate Y
+          default: 150.0
+        signature_width:
+          type: number
+          exclusiveMinimum: 0.0
+          title: Signature Width
+          default: 180.0
+        signature_height:
+          type: number
+          exclusiveMinimum: 0.0
+          title: Signature Height
+          default: 60.0
+      additionalProperties: false
+      type: object
+      required:
+      - consent_otp_code
+      - consent_statement
+      title: ConfirmSignatureRequest
+      description: 'Cuerpo de `POST /v1/signing-sessions/{id}/confirm`.
+
+
+        El código OTP se recibe para su verificación pero nunca se persiste ni se
+
+        registra: en la evidencia solo queda su hash SHA-256.'
+    ConfirmTransactionRequest:
+      properties:
+        otp_proof:
+          anyOf:
+          - $ref: '#/components/schemas/OtpProof'
+          - type: 'null'
+        otp_code:
+          anyOf:
+          - type: string
+            maxLength: 10
+            minLength: 4
+          - type: 'null'
+          title: Otp Code
+        consent_statement:
+          type: string
+          maxLength: 4000
+          minLength: 1
+          title: Consent Statement
+        consent_statement_version:
+          type: string
+          maxLength: 50
+          minLength: 1
+          title: Consent Statement Version
+        document_sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          title: Document Sha256
+        signer_ip:
+          anyOf:
+          - type: string
+            maxLength: 45
+          - type: 'null'
+          title: Signer Ip
+        signer_user_agent:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Signer User Agent
+      additionalProperties: false
+      type: object
+      required:
+      - consent_statement
+      - consent_statement_version
+      - document_sha256
+      title: ConfirmTransactionRequest
+      description: Cuerpo de `POST /v1/transactions/{id}/confirm`.
+    CreateTransactionRequest:
+      properties:
+        tenant_reference:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Tenant Reference
+        document:
+          $ref: '#/components/schemas/DocumentRef'
+        identity_decision:
+          $ref: '#/components/schemas/IdentityDecision'
+        service_level:
+          $ref: '#/components/schemas/ServiceLevel'
+          default: '1'
+        otp_mode:
+          $ref: '#/components/schemas/OtpMode'
+          default: TENANT_VERIFIED
+        jurisdiction:
+          anyOf:
+          - type: string
+            pattern: ^[A-Z]{2}$
+          - type: 'null'
+          title: Jurisdiction
+        metadata:
+          additionalProperties:
+            type: string
+          type: object
+          title: Metadata
+      additionalProperties: false
+      type: object
+      required:
+      - tenant_reference
+      - document
+      - identity_decision
+      title: CreateTransactionRequest
+      description: Cuerpo de `POST /v1/transactions`.
+    DocumentRef:
+      properties:
+        sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          title: Sha256
+        version:
+          type: integer
+          minimum: 1.0
+          title: Version
+        code:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Code
+        closed_at:
+          type: string
+          format: date-time
+          title: Closed At
+      additionalProperties: false
+      type: object
+      required:
+      - sha256
+      - version
+      - code
+      - closed_at
+      title: DocumentRef
+      description: 'El documento cerrado, identificado por su huella.
+
+
+        En hash-only el contenido nunca llega a FNC. La versión viaja junto a la
+
+        huella porque una huella suelta no dice contra qué comparar.'
+    ErrorResponse:
+      properties:
+        motivo:
+          $ref: '#/components/schemas/RejectionReason'
+        mensaje:
+          type: string
+          title: Mensaje
+        transaction_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Transaction Id
+        detalle:
+          additionalProperties:
+            anyOf:
+            - type: string
+            - type: integer
+            - items:
+                type: string
+              type: array
+          type: object
+          title: Detalle
+        reintentable:
+          type: boolean
+          title: Reintentable
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - motivo
+      - mensaje
+      title: ErrorResponse
+      description: 'Cuerpo de todo rechazo.
+
+
+        El `motivo` es lo que el tenant debe programar; el `mensaje` es para que una
+
+        persona entienda qué pasó y **puede cambiar entre versiones**.'
+    EvidenceBundle:
+      properties:
+        signing_session_id:
+          type: string
+          title: Signing Session Id
+        status:
+          $ref: '#/components/schemas/SigningStatus'
+        signed_document_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Signed Document Url
+        evidence_report_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Evidence Report Url
+        url_expires_in_seconds:
+          type: integer
+          title: Url Expires In Seconds
+        original_document_hash:
+          type: string
+          title: Original Document Hash
+        signed_document_hash:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Signed Document Hash
+        verifications:
+          $ref: '#/components/schemas/VerificationSummary'
+      additionalProperties: false
+      type: object
+      required:
+      - signing_session_id
+      - status
+      - url_expires_in_seconds
+      - original_document_hash
+      - verifications
+      title: EvidenceBundle
+      description: 'Respuesta de `GET /v1/signing-sessions/{id}/evidence`.
+
+
+        Las URLs son pre-firmadas de S3 con vigencia limitada (300 s por defecto).'
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    HealthResponse:
+      properties:
+        status:
+          type: string
+          title: Status
+        environment:
+          type: string
+          title: Environment
+        version:
+          type: string
+          title: Version
+        crypto_backend:
+          type: string
+          title: Crypto Backend
+      additionalProperties: false
+      type: object
+      required:
+      - status
+      - environment
+      - version
+      - crypto_backend
+      title: HealthResponse
+    IdentityDecision:
+      properties:
+        approved:
+          type: boolean
+          title: Approved
+        threshold_applied:
+          type: number
+          maximum: 1.0
+          minimum: 0.0
+          title: Threshold Applied
+        score:
+          anyOf:
+          - type: number
+            maximum: 1.0
+            minimum: 0.0
+          - type: 'null'
+          title: Score
+        score_scale:
+          type: string
+          enum:
+          - 0-1
+          - 0-100
+          title: Score Scale
+          default: 0-1
+        model_version:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Model Version
+        policy_version:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Policy Version
+        provider_reference:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Provider Reference
+        liveness_verified:
+          type: boolean
+          title: Liveness Verified
+          default: false
+        verified_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Verified At
+      additionalProperties: false
+      type: object
+      required:
+      - approved
+      - threshold_applied
+      - model_version
+      - policy_version
+      - provider_reference
+      title: IdentityDecision
+      description: 'Decisión de identidad **ya tomada por el tenant**.
+
+
+        FNC la asienta y no la revisa. El acta registra quién decidió, con qué umbral
+
+        y con qué versión de política: así la responsabilidad queda trazada donde
+
+        corresponde. FNC responde por la integridad del acta, no por la veracidad de
+
+        lo que el tenant declaró.'
+    OtpChannel:
+      type: string
+      enum:
+      - WHATSAPP
+      - SMS
+      - EMAIL
+      title: OtpChannel
+    OtpMode:
+      type: string
+      enum:
+      - TENANT_VERIFIED
+      - FNC_MANAGED
+      title: OtpMode
+      description: Quién emite y verifica el código de un solo uso.
+    OtpProof:
+      properties:
+        otp_reference:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Otp Reference
+        channel:
+          $ref: '#/components/schemas/OtpChannel'
+        destination_masked:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Destination Masked
+        sent_at:
+          type: string
+          format: date-time
+          title: Sent At
+        verified_at:
+          type: string
+          format: date-time
+          title: Verified At
+      additionalProperties: false
+      type: object
+      required:
+      - otp_reference
+      - channel
+      - destination_masked
+      - sent_at
+      - verified_at
+      title: OtpProof
+      description: 'Evidencia de un OTP que **el tenant** ya emitió y verificó.
+
+
+        Nunca lleva el código. Lo que viaja es su referencia opaca, el canal, el
+
+        destino enmascarado y las marcas de tiempo: lo suficiente para acreditar el
+
+        acto sin poder reproducirlo.'
+    PublicVerification:
+      properties:
+        verification_code:
+          type: string
+          title: Verification Code
+        exists:
+          type: boolean
+          title: Exists
+        status:
+          anyOf:
+          - $ref: '#/components/schemas/TransactionStatus'
+          - type: 'null'
+        document_sha256:
+          anyOf:
+          - type: string
+            pattern: ^[a-f0-9]{64}$
+          - type: 'null'
+          title: Document Sha256
+        document_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Document Code
+        signed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Signed At
+        jurisdiction:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Jurisdiction
+        legal_basis:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Legal Basis
+        service_level:
+          anyOf:
+          - $ref: '#/components/schemas/ServiceLevel'
+          - type: 'null'
+        acta_jws:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Acta Jws
+      additionalProperties: false
+      type: object
+      required:
+      - verification_code
+      - exists
+      title: PublicVerification
+      description: 'Respuesta de `GET /v1/verify/{code}`, pensada para una persona.
+
+
+        Es pública y sin autenticación: la comprueba quien recibe el documento, que
+
+        no tiene credenciales. Por eso **no lleva ningún dato personal**: confirma
+
+        que el acto existe, sobre qué documento y bajo qué norma, sin revelar quién
+
+        firmó a quien solo tiene el código.'
+    RejectionReason:
+      type: string
+      enum:
+      - UNAUTHENTICATED
+      - INVALID_SIGNATURE
+      - REQUEST_EXPIRED
+      - TENANT_NOT_ENABLED
+      - TRANSACTION_NOT_FOUND
+      - TRANSACTION_OF_ANOTHER_TENANT
+      - TRANSACTION_ALREADY_CONFIRMED
+      - TRANSACTION_EXPIRED
+      - INVALID_STATE
+      - IDENTITY_NOT_APPROVED
+      - INCOMPLETE_IDENTITY_DECISION
+      - OTP_NOT_VERIFIED
+      - OTP_NOT_FOR_TRANSACTION
+      - OTP_INCORRECT_CODE
+      - OTP_ATTEMPTS_EXHAUSTED
+      - OTP_EXPIRED
+      - OTP_ALREADY_USED
+      - INVALID_DOCUMENT
+      - DOCUMENT_TAMPERED
+      - DOCUMENT_REQUIRED
+      - DOCUMENT_TOO_LARGE
+      - EXCLUDED_LEGAL_ACT
+      - UNSUPPORTED_JURISDICTION
+      - INVALID_IDENTITY_DOCUMENT
+      - SERVICE_LEVEL_NOT_CONTRACTED
+      - SERVICE_LEVEL_UNAVAILABLE
+      - IDEMPOTENCY_CONFLICT
+      - IDEMPOTENCY_KEY_REQUIRED
+      - SEALING_FAILED
+      - EVIDENCE_NOT_PERSISTED
+      - TIMESTAMP_UNAVAILABLE
+      - INTERNAL_ERROR
+      title: RejectionReason
+      description: Motivos estables de rechazo de una operación.
+    ServiceLevel:
+      type: string
+      enum:
+      - '1'
+      - '2'
+      title: ServiceLevel
+      description: Los dos niveles del ADR-0007.
+    SigningSessionCompleted:
+      properties:
+        signing_session_id:
+          type: string
+          title: Signing Session Id
+        status:
+          $ref: '#/components/schemas/SigningStatus'
+        signed_document_hash:
+          type: string
+          title: Signed Document Hash
+        user_certificate_serial:
+          type: string
+          title: User Certificate Serial
+        signature_format:
+          type: string
+          title: Signature Format
+        timestamp:
+          $ref: '#/components/schemas/TimestampInfo'
+      additionalProperties: false
+      type: object
+      required:
+      - signing_session_id
+      - status
+      - signed_document_hash
+      - user_certificate_serial
+      - signature_format
+      - timestamp
+      title: SigningSessionCompleted
+      description: Respuesta de la confirmación de firma.
+    SigningSessionCreated:
+      properties:
+        signing_session_id:
+          type: string
+          title: Signing Session Id
+        status:
+          $ref: '#/components/schemas/SigningStatus'
+        original_document_hash:
+          type: string
+          title: Original Document Hash
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+      additionalProperties: false
+      type: object
+      required:
+      - signing_session_id
+      - status
+      - original_document_hash
+      - created_at
+      - expires_at
+      title: SigningSessionCreated
+      description: Respuesta de `POST /v1/signing-sessions`.
+    SigningStatus:
+      type: string
+      enum:
+      - INITIALIZED
+      - ONBOARDING_COMPLETED
+      - SIGNING_COMPLETED
+      - FAILED
+      - REVOKED
+      - COMPROMISED
+      title: SigningStatus
+      description: Estados de la máquina de estados de la sesión de firma.
+    TimestampInfo:
+      properties:
+        authority:
+          type: string
+          title: Authority
+        serial:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Serial
+        time:
+          type: string
+          format: date-time
+          title: Time
+      additionalProperties: false
+      type: object
+      required:
+      - authority
+      - time
+      title: TimestampInfo
+    TransactionConfirmed:
+      properties:
+        transaction_id:
+          type: string
+          title: Transaction Id
+        tenant_reference:
+          type: string
+          title: Tenant Reference
+        status:
+          $ref: '#/components/schemas/TransactionStatus'
+        service_level:
+          $ref: '#/components/schemas/ServiceLevel'
+        confirmed_at:
+          type: string
+          format: date-time
+          title: Confirmed At
+        acta:
+          $ref: '#/components/schemas/ActaSeal'
+        verification_code:
+          type: string
+          title: Verification Code
+        signed_document_sha256:
+          anyOf:
+          - type: string
+            pattern: ^[a-f0-9]{64}$
+          - type: 'null'
+          title: Signed Document Sha256
+        timestamp_authority:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Timestamp Authority
+      additionalProperties: false
+      type: object
+      required:
+      - transaction_id
+      - tenant_reference
+      - status
+      - service_level
+      - confirmed_at
+      - acta
+      - verification_code
+      title: TransactionConfirmed
+      description: Respuesta de `POST /v1/transactions/{id}/confirm`.
+    TransactionCreated:
+      properties:
+        transaction_id:
+          type: string
+          title: Transaction Id
+        tenant_reference:
+          type: string
+          title: Tenant Reference
+        status:
+          $ref: '#/components/schemas/TransactionStatus'
+        service_level:
+          $ref: '#/components/schemas/ServiceLevel'
+        jurisdiction:
+          type: string
+          title: Jurisdiction
+        document_sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          title: Document Sha256
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+      additionalProperties: false
+      type: object
+      required:
+      - transaction_id
+      - tenant_reference
+      - status
+      - service_level
+      - jurisdiction
+      - document_sha256
+      - created_at
+      - expires_at
+      title: TransactionCreated
+      description: Respuesta de `POST /v1/transactions`.
+    TransactionStatus:
+      type: string
+      enum:
+      - CREATED
+      - CONFIRMED
+      - REJECTED
+      - EXPIRED
+      title: TransactionStatus
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    VerificationSummary:
+      properties:
+        aml_pep_checked:
+          type: boolean
+          title: Aml Pep Checked
+        biometric_score:
+          type: number
+          title: Biometric Score
+        liveness_detected:
+          type: boolean
+          title: Liveness Detected
+        identity_match_approved:
+          type: boolean
+          title: Identity Match Approved
+      additionalProperties: false
+      type: object
+      required:
+      - aml_pep_checked
+      - biometric_score
+      - liveness_detected
+      - identity_match_approved
+      title: VerificationSummary

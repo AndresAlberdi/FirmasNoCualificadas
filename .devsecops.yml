@@ -40,6 +40,16 @@ componentes:
     proveedor: ninguno
     ambientes: {}
 
+  # SDK de referencia del contrato público. Se declara `node` y no `static`
+  # porque sí tiene suite propia: las pruebas de contrato que cualquier adaptador
+  # de tenant debe pasar. No se despliega — se publica como paquete cuando el
+  # contrato se estabilice.
+  - nombre: sdk
+    ruta: ./sdk/typescript
+    stack: node
+    proveedor: ninguno
+    ambientes: {}
+
 seguridad:
   # Sin entorno de staging desplegado no hay nada que escanear: el job completo
   # se omite. Se habilita junto con `produccion`.

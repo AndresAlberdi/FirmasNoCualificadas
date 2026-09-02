@@ -11,7 +11,7 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 from cryptography import x509 as cx509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
 from cryptography.hazmat.primitives.asymmetric import utils as asym_utils
 from cryptography.x509.oid import NameOID
 
@@ -23,6 +23,49 @@ from pscnc.models.audit_trail import (
 )
 
 CEDULA_SINTETICA = "4829153"
+
+
+class KmsFiel:
+    """Doble de KMS con la semántica documentada de `kms:Sign`.
+
+    Solo implementa lo que el sellador usa, y lo implementa como AWS: con
+    ``MessageType="DIGEST"`` firma el digest recibido **sin volver a hashearlo**.
+    Esa es la diferencia con `moto`, y es la que decide si el sobre JWS resultante
+    verifica con una librería estándar.
+
+    Mantiene una clave por alias, igual que el módulo de Terraform.
+    """
+
+    def __init__(self, aliases: list[str]) -> None:
+        self._claves = {alias: ec.generate_private_key(ec.SECP256R1()) for alias in aliases}
+
+    def _clave(self, key_id: str) -> ec.EllipticCurvePrivateKey:
+        try:
+            return self._claves[key_id]
+        except KeyError:
+            from botocore.exceptions import ClientError
+
+            raise ClientError(
+                {"Error": {"Code": "NotFoundException", "Message": "alias inexistente"}},
+                "Sign",
+            ) from None
+
+    def sign(
+        self, *, KeyId: str, Message: bytes, MessageType: str, SigningAlgorithm: str
+    ) -> dict[str, bytes]:
+        assert MessageType == "DIGEST", "El servicio siempre envía el digest, nunca el mensaje"
+        assert SigningAlgorithm == "ECDSA_SHA_256"
+        firma = self._clave(KeyId).sign(Message, ec.ECDSA(asym_utils.Prehashed(hashes.SHA256())))
+        return {"Signature": firma}
+
+    def get_public_key(self, *, KeyId: str) -> dict[str, bytes]:
+        publica = self._clave(KeyId).public_key()
+        return {
+            "PublicKey": publica.public_bytes(
+                encoding=serialization.Encoding.DER,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+        }
 
 
 class FakeCaSigner:

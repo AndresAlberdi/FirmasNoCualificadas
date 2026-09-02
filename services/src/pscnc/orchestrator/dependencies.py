@@ -16,14 +16,17 @@ from pscnc.crypto.ca_signer import CaSigner, KmsCaSigner, LocalCaSigner
 from pscnc.crypto.ephemeral_ca import EphemeralCertificateAuthority
 from pscnc.crypto.pades import PadesSigner, build_timestamper_factory
 from pscnc.crypto.tenant_keys import TenantKeyError, TenantKeyRing
+from pscnc.evidence.acta import ActaSealer
 from pscnc.logging_setup import get_logger
 from pscnc.onboarding.client import (
     HttpOnboardingClient,
     OnboardingClient,
     SandboxOnboardingClient,
 )
+from pscnc.orchestrator.idempotencia import IdempotencyControl, InMemoryIdempotencyStore
 from pscnc.orchestrator.security import SecretResolver, SecretsManagerResolver, StaticSecretResolver
 from pscnc.orchestrator.state_machine import SigningService
+from pscnc.orchestrator.transacciones import TransactionRepository, TransactionService
 from pscnc.repositories.dynamo_audit import AuditTrailRepository
 from pscnc.repositories.s3_vault import DocumentVault
 
@@ -142,6 +145,47 @@ def build_tenant_key_rings(settings: Settings | None = None) -> list[TenantKeyRi
     """Llaveros de todos los inquilinos declarados, para publicar sus claves."""
     ajustes = settings or get_settings()
     return [build_tenant_key_ring(tenant, ajustes) for tenant in ajustes.tenant_ids]
+
+
+@lru_cache(maxsize=1)
+def get_control_idempotencia() -> IdempotencyControl:
+    """Control de idempotencia del despliegue.
+
+    El almacén en memoria solo sirve con una instancia: dos réplicas no comparten
+    memoria, así que un reintento que caiga en otra emitiría un acta nueva para el
+    mismo acto. El almacén real es DynamoDB con TTL nativo (T-11).
+    """
+    settings = get_settings()
+    if settings.environment in ("staging", "prod"):
+        logger.warning(
+            "idempotency_store_in_memory",
+            environment=settings.environment,
+            detalle="Con más de una réplica, un reintento puede producir un acta nueva.",
+        )
+    return IdempotencyControl(InMemoryIdempotencyStore())
+
+
+@lru_cache(maxsize=1)
+def build_transaction_service() -> TransactionService:
+    """Servicio del contrato público v1.
+
+    El repositorio en memoria acompaña al almacén de idempotencia: los dos se
+    reemplazan juntos por su versión persistente (T-11).
+    """
+    settings = get_settings()
+    tenants = settings.tenant_ids
+    if not tenants:
+        raise RuntimeError(
+            "No hay inquilinos declarados: configure PSCNC_TENANT_IDS. Sin al menos uno "
+            "no puede sellarse ningún acta."
+        )
+
+    return TransactionService(
+        repositorio=TransactionRepository(),
+        sellador=ActaSealer(build_tenant_key_ring(tenants[0], settings)),
+        jurisdiccion_por_defecto=settings.jurisdiction,
+        ttl_minutos=settings.session_ttl_minutes,
+    )
 
 
 @lru_cache(maxsize=1)

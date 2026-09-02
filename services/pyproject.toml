@@ -90,3 +90,8 @@ plugins = ["pydantic.mypy"]
 
 [tool.bandit]
 exclude_dirs = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pyyaml>=6.0.3",
+]

@@ -60,6 +60,18 @@ lint-dashboard: ## ESLint y verificación de tipos del dashboard
 	cd dashboard && $(PNPM) run lint
 	cd dashboard && $(PNPM) run typecheck
 
+# ------------------------------------------------------------------- SDK ----
+.PHONY: sdk-test
+sdk-test: ## Pruebas de contrato del SDK de TypeScript
+	cd sdk/typescript && $(PNPM) install --frozen-lockfile
+	cd sdk/typescript && $(PNPM) test
+	cd sdk/typescript && $(PNPM) run lint
+	cd sdk/typescript && $(PNPM) run typecheck
+
+.PHONY: openapi
+openapi: ## Regenera api/openapi.yaml desde la aplicación
+	$(PY) scripts/exportar-openapi.py
+
 # -------------------------------------------------------------- Terraform ----
 .PHONY: tf-init tf-plan tf-apply tf-fmt tf-validate tf-test tf-jurisdiccion
 tf-init: ## terraform init del entorno ENV (por defecto dev)

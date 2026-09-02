@@ -36,12 +36,11 @@ from typing import Any
 
 import boto3
 import pytest
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, utils
 from jwcrypto import jwk as jose_jwk
 from jwcrypto import jws as jose_jws
 from moto import mock_aws
 
+from conftest import KmsFiel
 from pscnc.crypto.tenant_keys import TenantKeyRing
 from pscnc.evidence.acta import (
     ALGORITMO_JWS,
@@ -78,49 +77,6 @@ def _crear_clave_de_sello(cliente: Any, tenant: str) -> None:
         "KeyId"
     ]
     cliente.create_alias(AliasName=f"alias/fnc/{ENTORNO}/{tenant}/acta-seal/v1", TargetKeyId=clave)
-
-
-class KmsFiel:
-    """Doble de KMS con la semántica documentada de `kms:Sign`.
-
-    Solo implementa lo que el sellador usa, y lo implementa como AWS: con
-    ``MessageType="DIGEST"`` firma el digest recibido **sin volver a hashearlo**.
-    Esa es la diferencia con `moto`, y es la que decide si el sobre JWS resultante
-    verifica con una librería estándar.
-
-    Mantiene una clave por alias, igual que el módulo de Terraform.
-    """
-
-    def __init__(self, aliases: list[str]) -> None:
-        self._claves = {alias: ec.generate_private_key(ec.SECP256R1()) for alias in aliases}
-
-    def _clave(self, key_id: str) -> ec.EllipticCurvePrivateKey:
-        try:
-            return self._claves[key_id]
-        except KeyError:
-            from botocore.exceptions import ClientError
-
-            raise ClientError(
-                {"Error": {"Code": "NotFoundException", "Message": "alias inexistente"}},
-                "Sign",
-            ) from None
-
-    def sign(
-        self, *, KeyId: str, Message: bytes, MessageType: str, SigningAlgorithm: str
-    ) -> dict[str, bytes]:
-        assert MessageType == "DIGEST", "El servicio siempre envía el digest, nunca el mensaje"
-        assert SigningAlgorithm == "ECDSA_SHA_256"
-        firma = self._clave(KeyId).sign(Message, ec.ECDSA(utils.Prehashed(hashes.SHA256())))
-        return {"Signature": firma}
-
-    def get_public_key(self, *, KeyId: str) -> dict[str, bytes]:
-        publica = self._clave(KeyId).public_key()
-        return {
-            "PublicKey": publica.public_bytes(
-                encoding=serialization.Encoding.DER,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo,
-            )
-        }
 
 
 @pytest.fixture()

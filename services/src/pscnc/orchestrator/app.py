@@ -114,6 +114,12 @@ app = FastAPI(
 
 app.add_middleware(CuerpoCacheado)
 
+# Contrato público v1 (ADR-0007, ADR-0009). Se monta como router aparte para que
+# la superficie heredada de `/v1/signing-sessions` pueda retirarse sin tocarlo.
+from pscnc.orchestrator.rutas_v1 import router as router_v1  # noqa: E402
+
+app.include_router(router_v1)
+
 
 # --------------------------------------------------------------- Excepciones --
 @app.exception_handler(PscncError)
