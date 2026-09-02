@@ -23,11 +23,21 @@ from pscnc.onboarding.client import (
     OnboardingClient,
     SandboxOnboardingClient,
 )
-from pscnc.orchestrator.idempotencia import IdempotencyControl, InMemoryIdempotencyStore
+from pscnc.orchestrator.idempotencia import (
+    DEFAULT_WINDOW,
+    IdempotencyControl,
+    InMemoryIdempotencyStore,
+)
 from pscnc.orchestrator.security import SecretResolver, SecretsManagerResolver, StaticSecretResolver
 from pscnc.orchestrator.state_machine import SigningService
-from pscnc.orchestrator.transacciones import TransactionRepository, TransactionService
+from pscnc.orchestrator.transacciones import (
+    TransactionRepository,
+    TransactionService,
+    TransactionStore,
+)
 from pscnc.repositories.dynamo_audit import AuditTrailRepository
+from pscnc.repositories.dynamo_idempotencia import DynamoIdempotencyStore
+from pscnc.repositories.dynamo_transacciones import DynamoTransactionRepository
 from pscnc.repositories.s3_vault import DocumentVault
 
 logger = get_logger(__name__)
@@ -156,12 +166,28 @@ def get_control_idempotencia() -> IdempotencyControl:
     mismo acto. El almacén real es DynamoDB con TTL nativo (T-11).
     """
     settings = get_settings()
-    if settings.environment in ("staging", "prod"):
-        logger.warning(
-            "idempotency_store_in_memory",
-            environment=settings.environment,
-            detalle="Con más de una réplica, un reintento puede producir un acta nueva.",
+
+    if settings.idempotency_table:
+        return IdempotencyControl(
+            DynamoIdempotencyStore(
+                settings.idempotency_table,
+                region=settings.aws_region,
+                ventana=DEFAULT_WINDOW,
+            )
         )
+
+    # El almacén en memoria no sirve con más de una réplica: dos instancias no
+    # comparten memoria, así que un reintento que caiga en otra emitiría un acta
+    # nueva para el mismo acto de firma. Fuera de desarrollo es un error de
+    # configuración, no una degradación aceptable.
+    if settings.environment in ("staging", "prod"):
+        raise RuntimeError(
+            "PSCNC_IDEMPOTENCY_TABLE es obligatoria fuera de desarrollo: sin almacén "
+            "compartido, un reintento atendido por otra réplica emitiría un acta nueva "
+            "para el mismo acto de firma."
+        )
+
+    logger.warning("idempotency_store_in_memory", environment=settings.environment)
     return IdempotencyControl(InMemoryIdempotencyStore())
 
 
@@ -188,13 +214,25 @@ def build_transaction_service() -> TransactionService:
         firmante_pades = build_pades_signer(settings)
 
     return TransactionService(
-        repositorio=TransactionRepository(),
+        repositorio=_build_transaction_repository(settings),
         sellador=ActaSealer(build_tenant_key_ring(tenants[0], settings)),
         jurisdiccion_por_defecto=settings.jurisdiction,
         ttl_minutos=settings.session_ttl_minutes,
         firmante_pades=firmante_pades,
         environment=settings.environment,
     )
+
+
+def _build_transaction_repository(settings: Settings) -> TransactionStore:
+    """Repositorio de transacciones: DynamoDB donde haya tabla, memoria en dev.
+
+    La transacción es pista de auditoría —su historia se exhibe ante una
+    pericia—, así que fuera de desarrollo tiene que persistir de verdad.
+    """
+    if settings.audit_table and settings.environment != "dev":
+        return DynamoTransactionRepository(settings.audit_table, region=settings.aws_region)
+    logger.warning("transaction_repository_in_memory", environment=settings.environment)
+    return TransactionRepository()
 
 
 def build_pades_signer(settings: Settings) -> PadesSigner:

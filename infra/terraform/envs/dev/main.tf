@@ -94,6 +94,14 @@ module "intermediate_ca" {
 }
 
 # ------------------------------------------------------------ Persistencia ---
+module "idempotency" {
+  source = "../../modules/idempotency-dynamodb"
+
+  table_name  = "PSCNC_Idempotency_${local.environment}"
+  kms_key_arn = aws_kms_key.data.arn
+  tags        = local.common_tags
+}
+
 module "audit_trail" {
   source = "../../modules/audit-trail-dynamodb"
 

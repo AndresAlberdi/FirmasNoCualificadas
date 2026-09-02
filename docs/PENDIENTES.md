@@ -8,6 +8,9 @@ válido, y alguien lo va a presentar como si lo fuera.
 
 Última revisión: 2026-09-02.
 
+**Resuelto desde la última revisión:** T-11 (persistencia en DynamoDB del almacén de
+idempotencia y del repositorio de transacciones).
+
 ---
 
 ## 1. Bloqueantes del nivel 2 en producción
@@ -71,7 +74,6 @@ los cite en producción. Una norma sin su PDF es una cita que nadie puede contra
 | T-07 | **Límite de tiempo en la extracción de texto del PDF** | `legal_guard` usa pypdf, que acumula CVE de denegación de servicio sin corrección disponible. Hoy se acota por tamaño (25 MiB) y por caracteres (200.000), pero un bucle infinito no lo detiene ninguno de los dos. Es la mitigación que falta para levantar la excepción del manifiesto |
 | T-08 | **WAF con limitación de tasa sobre CloudFront y egreso restringido** | Excepciones AWS-0011 y AWS-0104 del manifiesto, con vencimiento el 2026-12-02. El egreso definitivo depende de conocer el rango de la TSA (B-01) |
 | T-09 | **Las condiciones de las políticas de clave de KMS no están verificadas contra AWS real** | Ver el detalle abajo: es una limitación del simulador, no un olvido |
-| T-11 | **El almacén de idempotencia y el repositorio de transacciones son en memoria** | Solo sirven con una instancia: dos réplicas no comparten memoria, así que un reintento que caiga en otra emitiría un acta nueva para el mismo acto de firma. Los reemplaza DynamoDB con TTL nativo, junto con la persistencia de la pista de auditoría. **Es bloqueante para producción**, no para el desarrollo del contrato |
 | T-12 | **El modo `otp_mode: FNC_MANAGED` está declarado pero no implementado** | Exige el proveedor de mensajería. Hoy se rechaza con un motivo propio en lugar de fallar de forma ambigua. El primer tenant usa `TENANT_VERIFIED`, así que no bloquea su integración |
 | T-10 | **`moto` ignora `MessageType="DIGEST"` de `kms:Sign`** | Vuelve a aplicar SHA-256 sobre el digest, mientras AWS lo firma tal cual. Por eso el sellado de actas se prueba contra un doble fiel a la semántica documentada y no contra `moto`. Conviene reverificarlo contra `dev` real junto con la prueba de humo de T-09 |
 
