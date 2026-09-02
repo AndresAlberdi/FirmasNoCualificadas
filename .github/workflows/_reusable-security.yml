@@ -403,6 +403,9 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
           format: sarif
+          # Misma razón que en el análisis de configuración: sin esto el bloqueo
+          # se evalúa sobre todas las severidades y no sobre `bloquear_en`.
+          limit-severities-for-sarif: true
           output: trivy-fs.sarif
           trivy-config: ${{ steps.trivycfg.outputs.ruta }}
 
@@ -531,6 +534,13 @@ jobs:
           severity: ${{ inputs.bloquear_en }}
           exit-code: '1'
           format: sarif
+          # Sin esto, `trivy-action` construye el SARIF «with all severities» y
+          # ejecuta Trivy SIN `--severity`: el `exit-code: 1` pasa a evaluarse
+          # sobre TODAS las severidades, de modo que un hallazgo MEDIUM o LOW
+          # bloquea el pipeline aunque `bloquear_en` diga CRITICAL,HIGH. El
+          # control deja de hacer lo que su nombre dice, y el registro no lo
+          # explica: solo muestra el código de salida.
+          limit-severities-for-sarif: true
           output: trivy-config.sarif
 
       # El paso anterior emite SARIF, de modo que cuando bloquea el registro solo
