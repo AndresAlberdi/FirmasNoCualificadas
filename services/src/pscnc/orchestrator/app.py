@@ -17,6 +17,7 @@ from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from pscnc import __version__
 from pscnc.config import get_settings
@@ -47,6 +48,58 @@ TAMANIO_MAXIMO_PDF = 25 * 1024 * 1024  # 25 MiB
 # `X-Forwarded-For`, así que este valor señala una anomalía de despliegue.
 IP_NO_CAPTURADA = "no-capturada"
 
+
+class CuerpoCacheado:
+    """Middleware ASGI que materializa el cuerpo y repone el canal de recepción.
+
+    La firma HMAC cubre el cuerpo completo, de modo que la autenticación tiene
+    que leerlo. En una petición ``multipart/form-data`` el analizador de FastAPI
+    consume el flujo para resolver los parámetros ``Form`` y ``File`` **sin**
+    dejarlo en la caché de la petición, y la lectura posterior fallaba con
+    ``RuntimeError: Stream consumed``: el endpoint de creación de sesión no
+    podía autenticar ninguna petición.
+
+    Reponer el canal de recepción no alcanza: el analizador de formularios y la
+    dependencia de autenticación comparten la **misma** instancia de
+    ``Request``, y aquel la deja marcada como consumida. Por eso el cuerpo se
+    publica además en el estado de la petición, de donde la autenticación lo
+    toma sin volver a leer el flujo.
+
+    El tamaño ya está acotado antes de llegar acá por el límite del balanceador;
+    el control de 25 MiB del endpoint sigue aplicando sobre el archivo.
+    """
+
+    #: Clave bajo la que viaja el cuerpo crudo en ``request.state``.
+    CLAVE_ESTADO = "cuerpo_firmado"
+
+    def __init__(self, app: ASGIApp) -> None:
+        self._app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope.get("method") not in ("POST", "PUT", "PATCH"):
+            await self._app(scope, receive, send)
+            return
+
+        partes: list[bytes] = []
+        while True:
+            mensaje = await receive()
+            if mensaje["type"] != "http.request":
+                # Desconexión del cliente: se delega el mensaje sin alterarlo.
+                await self._app(scope, receive, send)
+                return
+            partes.append(mensaje.get("body", b""))
+            if not mensaje.get("more_body", False):
+                break
+
+        cuerpo = b"".join(partes)
+        scope.setdefault("state", {})[self.CLAVE_ESTADO] = cuerpo
+
+        async def recibir() -> Message:
+            return {"type": "http.request", "body": cuerpo, "more_body": False}
+
+        await self._app(scope, recibir, send)
+
+
 app = FastAPI(
     title="PSCNC · API de Firma Electrónica No Cualificada",
     version=__version__,
@@ -57,6 +110,8 @@ app = FastAPI(
     docs_url="/docs",
     openapi_url="/openapi.json",
 )
+
+app.add_middleware(CuerpoCacheado)
 
 
 # --------------------------------------------------------------- Excepciones --
@@ -74,7 +129,11 @@ async def _manejar_error_dominio(_request: Request, exc: PscncError) -> JSONResp
 async def contexto_autenticado(request: Request) -> SecurityContext:
     """Verifica la firma HMAC de la petición y devuelve el contexto del inquilino."""
     settings = get_settings()
-    cuerpo = await request.body()
+    # El cuerpo lo dejó el middleware; leerlo de la petición fallaría cuando el
+    # analizador de formularios ya consumió el flujo.
+    cuerpo = getattr(request.state, CuerpoCacheado.CLAVE_ESTADO, None)
+    if cuerpo is None:
+        cuerpo = await request.body()
     return authenticate(
         headers=dict(request.headers),
         method=request.method,

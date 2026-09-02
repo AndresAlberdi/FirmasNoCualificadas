@@ -13,7 +13,7 @@ Dos reglas estructurales, ambas verificadas en tiempo de ejecución:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -50,6 +50,11 @@ def _to_dynamo(valor: Any) -> Any:
     """Convierte tipos de Python a los admitidos por DynamoDB."""
     if isinstance(valor, datetime):
         return valor.isoformat().replace("+00:00", "Z")
+    if isinstance(valor, date):
+        # `datetime` se comprueba primero porque es subclase de `date`. Sin esta
+        # rama, la fecha de nacimiento del firmante —un `date`— llega cruda al
+        # serializador de DynamoDB y aborta la escritura del expediente entero.
+        return valor.isoformat()
     if isinstance(valor, float):
         # DynamoDB no admite float: se usa Decimal para no perder precisión de los
         # puntajes biométricos, que son datos periciales.
