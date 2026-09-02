@@ -257,3 +257,70 @@ resource "aws_cloudwatch_metric_alarm" "kms_sign_unexpected_principal" {
   alarm_actions       = [aws_sns_topic.secops.arn]
   tags                = var.tags
 }
+
+###############################################################################
+# Deshabilitación o eliminación de una clave: SEV-1 inmediato.
+#
+# Deshabilitar la clave de la CA detiene toda emisión de certificados; eliminar
+# una clave de sello destruye la verificabilidad de cada acta que firmó, y
+# eliminar una de evidencias hace ilegible evidencia con obligación legal de
+# conservación. Las tres operaciones son legítimas dentro del procedimiento de
+# emergencia (docs/RUNBOOK-break-glass.md) y ninguna debería ocurrir fuera de él,
+# así que la alarma se dispara con una sola aparición.
+###############################################################################
+
+resource "aws_cloudwatch_log_metric_filter" "kms_key_lifecycle" {
+  name           = "${local.name}-kms-key-lifecycle"
+  log_group_name = aws_cloudwatch_log_group.trail.name
+  pattern        = "{ ($.eventSource = \"kms.amazonaws.com\") && (($.eventName = \"DisableKey\") || ($.eventName = \"ScheduleKeyDeletion\") || ($.eventName = \"DeleteAlias\") || ($.eventName = \"PutKeyPolicy\")) }"
+
+  metric_transformation {
+    name      = "PscncKmsKeyLifecycleEvents"
+    namespace = "PSCNC/Security"
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "kms_key_lifecycle" {
+  alarm_name          = "pscnc-kms-key-lifecycle-${var.environment}"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "PscncKmsKeyLifecycleEvents"
+  namespace           = "PSCNC/Security"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 1
+  alarm_description   = "SEV-1: se deshabilitó, se programó la eliminación o se alteró la política de una clave de KMS"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.secops.arn]
+  tags                = var.tags
+}
+
+# Descifrado rechazado por contexto: puede ser un error de enrutamiento entre
+# inquilinos, o un intento de acceso cruzado. En ambos casos hay que mirarlo.
+resource "aws_cloudwatch_log_metric_filter" "kms_context_mismatch" {
+  name           = "${local.name}-kms-context-mismatch"
+  log_group_name = aws_cloudwatch_log_group.trail.name
+  pattern        = "{ ($.eventSource = \"kms.amazonaws.com\") && ($.eventName = \"Decrypt\") && ($.errorCode = \"InvalidCiphertextException\") }"
+
+  metric_transformation {
+    name      = "PscncKmsContextMismatch"
+    namespace = "PSCNC/Security"
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "kms_context_mismatch" {
+  alarm_name          = "pscnc-kms-context-mismatch-${var.environment}"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "PscncKmsContextMismatch"
+  namespace           = "PSCNC/Security"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = var.kms_context_mismatch_threshold
+  alarm_description   = "Descifrado rechazado por contexto: posible acceso cruzado entre inquilinos (ADR-0005)"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.secops.arn]
+  tags                = var.tags
+}

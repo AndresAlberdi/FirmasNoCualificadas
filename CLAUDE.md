@@ -44,6 +44,8 @@ make run-api          # API B2B en http://localhost:8080
 make security         # bandit + checkov
 make tf-validate      # valida el Terraform del entorno ENV (por defecto dev)
 make tf-plan          # plan del entorno ENV
+make tf-test          # pruebas de infraestructura (no necesitan credenciales)
+make tf-jurisdiccion  # regenera jurisdiccion.auto.tfvars desde el perfil
 ```
 
 **Antes de cualquier commit:** `make test` tiene que pasar. Incluye `mypy --strict`, que hoy
@@ -148,25 +150,39 @@ todavía y la fase que las cubre es parte del trabajo, no un extra.**
    `test_api_http.py::test_el_inquilino_sale_de_la_credencial_y_no_del_cuerpo`
 
 7. **Una operación sobre el tenant A no puede alcanzar la clave de KMS del tenant B.**
-   → **PENDIENTE** (fase 4, con `moto`/LocalStack)
+   El aislamiento vive en la política de la clave, no en el código: si el contexto de
+   cifrado no coincide, KMS se niega a descifrar aunque el llamador tenga permisos sobre
+   ambas claves.
+   → `test_tenant_keys.py::test_otro_inquilino_no_puede_descifrar`,
+   `::test_el_sello_de_un_inquilino_no_valida_con_la_clave_de_otro`
 
 ### Custodia de claves (ADR-0006)
 
 8. **Ningún rol humano tiene `kms:Sign`.** Quien puede firmar puede fabricar evidencia.
-   → **PENDIENTE** (fase 4)
+   Las políticas de `modules/kms-tenant-keys` conceden administración sin firma; el rol de
+   servicio firma sin poder administrar.
+   → revisión de política en `modules/kms-tenant-keys/main.tf`; alarma
+   `kms_sign_unexpected_principal` en `modules/observability`
 
 9. **La clave se selecciona por alias versionado, nunca por `KeyId` fijo.** Un `KeyId`
-   cableado convierte cada rotación en un despliegue.
-   → **PENDIENTE** (fase 4)
+   cableado convierte cada rotación en un despliegue, y durante el solapamiento hacen falta
+   las dos claves a la vez — la anterior verificando, la nueva firmando.
+   → `test_tenant_keys.py::TestSeleccionPorAlias`
 
 10. **Toda operación simétrica lleva `kms:EncryptionContext` con `tenant_id` y
-    `transaction_id`,** exigido por condición en la política de clave.
-    → **PENDIENTE** (fase 4)
+    `transaction_id`,** exigido por condición en la política de clave. El contexto va
+    autenticado con el texto cifrado: liga cada objeto a su inquilino y a su transacción
+    sin depender de que el código lo compruebe.
+    → `test_tenant_keys.py::test_el_contexto_de_cifrado_lleva_inquilino_y_transaccion`,
+    `::test_no_se_puede_descifrar_en_otra_transaccion`
 
 11. **La retención de S3 Object Lock sale del perfil de jurisdicción y el `plan` de Terraform
     falla si es menor al mínimo.** En modo COMPLIANCE la retención es irreversible: un valor
-    equivocado no se corrige, se hereda.
-    → **PENDIENTE** (fase 4)
+    equivocado no se corrige, se hereda. El mínimo lo exporta
+    `scripts/exportar-jurisdiccion.py` desde el perfil, para que el dato tenga una sola
+    fuente; los módulos toman la retención de la salida de `retention-gate`, de modo que la
+    compuerta quede en el grafo de dependencias y no pueda saltearse por olvido.
+    → `modules/retention-gate/tests/compuerta.tftest.hcl` (`make tf-test`)
 
 12. **Sin fecha cierta no hay firma de nivel 2.** Si la TSA falla, la transacción falla
     completa: nunca se degrada en silencio a PAdES-B-B. Un certificado efímero sin sello de

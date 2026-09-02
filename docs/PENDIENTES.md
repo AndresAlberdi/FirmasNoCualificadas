@@ -69,6 +69,34 @@ los cite en producción. Una norma sin su PDF es una cita que nadie puede contra
 | T-06 | **El panel B2B pasa de `static` a `node` en `.devsecops.yml`** | Hoy es un prototipo con datos simulados y sin suite de pruebas. Al convertirse en producto necesita Vitest y quedar sujeto al umbral de cobertura |
 | T-07 | **Límite de tiempo en la extracción de texto del PDF** | `legal_guard` usa pypdf, que acumula CVE de denegación de servicio sin corrección disponible. Hoy se acota por tamaño (25 MiB) y por caracteres (200.000), pero un bucle infinito no lo detiene ninguno de los dos. Es la mitigación que falta para levantar la excepción del manifiesto |
 | T-08 | **WAF con limitación de tasa sobre CloudFront y egreso restringido** | Excepciones AWS-0011 y AWS-0104 del manifiesto, con vencimiento el 2026-12-02. El egreso definitivo depende de conocer el rango de la TSA (B-01) |
+| T-09 | **Las condiciones de las políticas de clave de KMS no están verificadas contra AWS real** | Ver el detalle abajo: es una limitación del simulador, no un olvido |
+
+### T-09 · Qué prueban y qué no prueban los tests de aislamiento por clave
+
+Distinción que conviene no perder de vista al leer `test_tenant_keys.py`, porque de ella
+depende cuánta confianza merece:
+
+**Lo que sí queda demostrado, y es criptográfico:** un texto cifrado para el inquilino A no
+puede descifrarse en el contexto del inquilino B ni en el de otra transacción. El contexto
+de cifrado va **autenticado junto con el texto cifrado**, de modo que alterarlo invalida el
+descifrado por construcción del cifrado autenticado, no por una regla que alguien pueda
+desactivar. Ese comportamiento es idéntico en `moto` y en AWS, y está comprobado.
+
+**Lo que NO queda demostrado:** que las *condiciones de la política de clave* funcionen.
+`moto` no evalúa políticas de KMS — se verificó explícitamente: permite cifrar **sin**
+contexto de cifrado, que es justamente lo que la política de producción deniega. En
+consecuencia, estas condiciones están escritas y revisadas, pero no ejercitadas:
+
+* `kms:EncryptionContext:tenant_id` obligatorio e igual al inquilino de la clave.
+* `kms:EncryptionContext:transaction_id` obligatorio.
+* `kms:ViaService` acotado a S3 y DynamoDB de la región.
+* La denegación de `kms:ScheduleKeyDeletion` fuera del rol de emergencia.
+* La separación de funciones: que los roles de administración no puedan firmar.
+
+**Cómo se cierra:** una prueba de humo contra el entorno `dev` real, una vez que exista la
+cuenta de AWS (B-01/B-02), que intente cada operación denegada y espere `AccessDenied`.
+Mientras tanto, el control existe en la política pero su eficacia se apoya en la revisión
+del código, no en una comprobación automática.
 
 ---
 

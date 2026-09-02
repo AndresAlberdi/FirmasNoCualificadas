@@ -108,7 +108,7 @@ module "evidence_vault" {
   signed_bucket_name          = var.signed_bucket_name
   evidence_bucket_name        = var.evidence_bucket_name
   kms_key_arn                 = aws_kms_key.data.arn
-  object_lock_retention_days  = var.object_lock_retention_days
+  object_lock_retention_days  = module.retention_gate.verified_retention_days
   object_lock_admin_role_arns = var.secops_admin_role_arns
   tags                        = local.common_tags
 }
@@ -236,4 +236,47 @@ module "crl_distribution" {
   lambda_package_path  = var.crl_lambda_package_path
   secops_topic_arn     = module.observability.secops_topic_arn
   tags                 = local.common_tags
+}
+
+###############################################################################
+# Compuerta de conservación (ADR-0006/0008, regla inviolable 11)
+#
+# Los módulos que crean buckets con Object Lock toman la retención de la SALIDA
+# de este módulo y no de la variable directa: así la compuerta queda dentro del
+# grafo de dependencias y no puede saltearse por olvido.
+###############################################################################
+
+module "retention_gate" {
+  source = "../../modules/retention-gate"
+
+  jurisdiction_code                   = var.jurisdiction_code
+  jurisdiction_name                   = var.jurisdiction_name
+  jurisdiction_minimum_retention_days = var.jurisdiction_minimum_retention_days
+  jurisdiction_retention_legal_basis  = var.jurisdiction_retention_legal_basis
+  jurisdiction_legally_validated      = var.jurisdiction_legally_validated
+
+  configured_retention_days = var.object_lock_retention_days
+  environment               = local.environment
+}
+
+###############################################################################
+# Claves por inquilino (ADR-0006)
+###############################################################################
+
+module "tenant_keys" {
+  source   = "../../modules/kms-tenant-keys"
+  for_each = var.tenants
+
+  tenant_id   = each.key
+  environment = local.environment
+  region      = var.region
+
+  signer_role_arns      = [local.signer_task_role_arn]
+  admin_role_arns       = var.secops_admin_role_arns
+  break_glass_role_arns = var.break_glass_role_arns
+
+  acta_seal_key_version = each.value.acta_seal_key_version
+  evidence_key_version  = each.value.evidence_key_version
+
+  tags = local.common_tags
 }

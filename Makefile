@@ -2,6 +2,8 @@ SHELL := /bin/bash
 ENV ?= dev
 PY  := services/.venv/bin/python
 TF_DIR := infra/terraform/envs/$(ENV)
+# Jurisdicción cuyo perfil se exporta a Terraform (ver ADR-0008).
+JURISDICCION ?= PY
 
 # Gestión de paquetes (ver `docs/adr/0009-contrato-de-compatibilidad-con-tenants.md`
 # y CLAUDE.md): `uv` para Python con `uv.lock` versionado, y `pnpm` vía Corepack
@@ -59,7 +61,7 @@ lint-dashboard: ## ESLint y verificación de tipos del dashboard
 	cd dashboard && $(PNPM) run typecheck
 
 # -------------------------------------------------------------- Terraform ----
-.PHONY: tf-init tf-plan tf-apply tf-fmt tf-validate
+.PHONY: tf-init tf-plan tf-apply tf-fmt tf-validate tf-test tf-jurisdiccion
 tf-init: ## terraform init del entorno ENV (por defecto dev)
 	terraform -chdir=$(TF_DIR) init
 
@@ -74,6 +76,15 @@ tf-fmt: ## Normaliza el formato HCL
 
 tf-validate: ## Valida la sintaxis de todos los entornos
 	terraform -chdir=$(TF_DIR) validate
+
+.PHONY: tf-test
+tf-test: ## Pruebas de la infraestructura (compuerta de conservación, sin credenciales)
+	terraform -chdir=infra/terraform/modules/retention-gate init -backend=false -input=false
+	terraform -chdir=infra/terraform/modules/retention-gate test
+
+.PHONY: tf-jurisdiccion
+tf-jurisdiccion: ## Regenera jurisdiccion.auto.tfvars del entorno ENV desde el perfil
+	$(PY) scripts/exportar-jurisdiccion.py $(JURISDICCION) $(TF_DIR)
 
 # ------------------------------------------------------------- Seguridad -----
 .PHONY: security

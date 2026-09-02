@@ -63,3 +63,14 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "kms_context_mismatch_threshold" {
+  description = <<-EOT
+    Descifrados rechazados por contexto en cinco minutos que disparan la alarma.
+    No es cero porque un reintento tras una rotación puede producir uno aislado;
+    una racha, en cambio, indica un error de enrutamiento entre inquilinos o un
+    intento de acceso cruzado.
+  EOT
+  type        = number
+  default     = 3
+}
