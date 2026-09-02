@@ -20,7 +20,7 @@ declarado ante la autoridad debe existir en el código o en Terraform.
 - [ ] Patente comercial municipal vigente.
 - [ ] Acta de la última asamblea (sociedades anónimas).
 - [ ] Póliza de responsabilidad civil profesional dimensionada según el régimen de
-      responsabilidad aplicable (ver `blueprints/regimen-responsabilidad-seguros-servicios-confianza-paraguay.md`).
+      responsabilidad aplicable (ver `diseno/regimen-responsabilidad-seguros-servicios-confianza-paraguay.md`).
 
 ## Fase 2 — Inscripción en el REPSE
 
@@ -54,7 +54,7 @@ sumario administrativo y multa.
 
 - [ ] Formulario oficial de comunicación técnica, firmado digitalmente.
 - [ ] **Declaración de Prácticas de los Servicios de Confianza (DPSC)** — base en
-      `blueprints/declaracion-practicas-perfiles-pscnc.md`. Debe describir con exactitud lo
+      `diseno/declaracion-practicas-perfiles-pscnc.md`. Debe describir con exactitud lo
       que este repositorio implementa:
   - [ ] Algoritmos: SHA-256, RSASSA-PKCS1-v1_5 / RSASSA-PSS, RSA-4096 para la CA.
   - [ ] Custodia de claves: AWS KMS, HSM FIPS 140-2 Nivel 3, sin exportación.

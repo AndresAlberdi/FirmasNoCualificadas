@@ -21,7 +21,7 @@ FirmasNoCualificadas/
 │   ├── CUMPLIMIENTO-MIC.md   Ruta administrativa REPSE → DGFDCE
 │   ├── RUNBOOK-break-glass.md Procedimiento de compromiso de la CA
 │   ├── adr/                  Architecture Decision Records
-│   └── blueprints/           Especificaciones fuente (insumo de diseño)
+│   └── diseno/               Documentos de diseño y normativos (ver diseno/INDICE.md)
 ├── infra/terraform/          Infraestructura como código (AWS)
 │   ├── modules/              Módulos reutilizables por dominio
 │   └── envs/{dev,prod}       Composición por entorno

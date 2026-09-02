@@ -100,7 +100,7 @@ electrónica simple.
 ## 4. Modelo de datos forense
 
 Tabla única `PSCNC_Audit_Trail` en DynamoDB, detallada en
-[`blueprints/esquema-base-datos-auditoria-pscnc.md`](blueprints/esquema-base-datos-auditoria-pscnc.md)
+[`diseno/esquema-base-datos-auditoria-pscnc.md`](diseno/esquema-base-datos-auditoria-pscnc.md)
 y materializada en `pscnc.models.audit_trail`.
 
 | Índice | PK | SK | Consulta que habilita |

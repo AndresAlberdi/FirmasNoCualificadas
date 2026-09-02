@@ -53,3 +53,7 @@ evidence-*.pdf
 .DS_Store
 .idea/
 .vscode/
+
+# Artefactos de importación del scaffolding (no forman parte del producto)
+FirmasNoCualificadas-repo.tar.gz
+PROMPT_CLAUDE_CODE_IMPORTACION.md

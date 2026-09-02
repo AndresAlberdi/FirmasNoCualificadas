@@ -1,6 +1,6 @@
 """Modelo de la pista de auditoría forense (`PSCNC_Audit_Trail`).
 
-Materializa el esquema descrito en `docs/blueprints/esquema-base-datos-auditoria-pscnc.md`.
+Materializa el esquema descrito en `docs/diseno/esquema-base-datos-auditoria-pscnc.md`.
 Cada objeto responde a una de las cuatro preguntas de una pericia informática:
 
 * ``identity_evidence``      — ¿quién firmó?
