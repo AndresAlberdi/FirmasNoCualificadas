@@ -66,10 +66,38 @@ los cite en producción. Una norma sin su PDF es una cita que nadie puede contra
 | T-03 | **Dígito verificador de la cédula paraguaya** | La validación comprueba formato, no dígito verificador |
 | T-04 | **Modo COMPLIANCE de S3 Object Lock no se puede simular fielmente** en pruebas locales | Se valida en el entorno `dev` real (ADR-0003) |
 | T-05 | **Alta automatizada de tenant** | Crear un tenant implica claves, alias y políticas de KMS: es una operación de infraestructura, no un registro en una tabla (ADR-0006) |
+| T-06 | **El panel B2B pasa de `static` a `node` en `.devsecops.yml`** | Hoy es un prototipo con datos simulados y sin suite de pruebas. Al convertirse en producto necesita Vitest y quedar sujeto al umbral de cobertura |
+| T-07 | **Límite de tiempo en la extracción de texto del PDF** | `legal_guard` usa pypdf, que acumula CVE de denegación de servicio sin corrección disponible. Hoy se acota por tamaño (25 MiB) y por caracteres (200.000), pero un bucle infinito no lo detiene ninguno de los dos. Es la mitigación que falta para levantar la excepción del manifiesto |
+| T-08 | **WAF con limitación de tasa sobre CloudFront y egreso restringido** | Excepciones AWS-0011 y AWS-0104 del manifiesto, con vencimiento el 2026-12-02. El egreso definitivo depende de conocer el rango de la TSA (B-01) |
 
 ---
 
-## 5. Decisiones de negocio abiertas
+## 5. Configuración remota de GitHub (la ejecuta el propietario)
+
+El bootstrap del estándar se ejecutó con `--sin-gh`: crear variables y secretos, y
+aplicar rulesets, son cambios en la cuenta de GitHub y no los hace un agente.
+
+**Secretos** (Settings → Secrets → Actions). Ninguno es imprescindible hoy, porque el
+manifiesto declara `produccion: false`:
+
+| Secreto | Para qué | ¿Hace falta ya? |
+| :---- | :---- | :---- |
+| `GITLEAKS_LICENSE` | Solo si el repositorio pasa a una organización | No |
+| `RELEASE_TOKEN` | PAT fine-grained para que el tag de `release.yml` dispare el pipeline | No, hasta el primer release |
+| Credenciales de despliegue | Se generan con `setup-oidc-aws.sh` cuando exista la cuenta | No, hasta B-01/B-02 |
+
+**Variables** (Settings → Variables → Actions): `MODO=A`, `GHAS_ENABLED=false`,
+`NODE_VERSION=22`, `PYTHON_VERSION=3.12`, `COVERAGE_MIN=70`, `BLOQUEAR_EN=CRITICAL,HIGH`,
+`WORKFLOW_PRODUCCION=ci-multicloud.yml`, `TAG_FIRMADO_REQUERIDO=false`. Las de despliegue
+(`STAGING_URL`, `PROD_URL` y las de la nube) quedan para cuando exista la cuenta.
+
+**Ruleset de `main`**: exigir el check `compuerta-pr` y revisión por pares. Es lo que impide
+que un cambio entre sin pasar el pipeline. Está pendiente y es lo más importante de esta
+lista.
+
+---
+
+## 6. Decisiones de negocio abiertas
 
 | # | Pregunta | Quién decide |
 | :-- | :---- | :---- |

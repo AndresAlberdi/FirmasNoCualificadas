@@ -21,6 +21,22 @@ resource "aws_s3_bucket" "crl" {
   })
 }
 
+# La CRL es contenido público y firmado, de modo que el cifrado no protege su
+# confidencialidad: protege su integridad en reposo frente a una escritura que
+# no pase por la política de la clave. Una CRL alterada haría que un validador
+# aceptara certificados revocados.
+resource "aws_s3_bucket_server_side_encryption_configuration" "crl" {
+  bucket = aws_s3_bucket.crl.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = var.kms_evidence_key_arn
+    }
+    bucket_key_enabled = true
+  }
+}
+
 resource "aws_s3_bucket_public_access_block" "crl" {
   bucket                  = aws_s3_bucket.crl.id
   block_public_acls       = true
@@ -181,14 +197,14 @@ resource "aws_lambda_function" "crl_publisher" {
 
   environment {
     variables = {
-      PSCNC_ENVIRONMENT           = var.environment
-      PSCNC_CRYPTO_BACKEND        = "kms"
-      PSCNC_KMS_CA_KEY_ID         = var.kms_ca_key_arn
-      PSCNC_CRL_BUCKET            = aws_s3_bucket.crl.id
-      PSCNC_CRL_OBJECT_KEY        = var.crl_object_key
-      PSCNC_CRL_VALIDITY_HOURS    = tostring(var.crl_validity_hours)
-      PSCNC_CRL_DISTRIBUTION_ID   = aws_cloudfront_distribution.crl.id
-      PSCNC_SECOPS_TOPIC_ARN      = var.secops_topic_arn
+      PSCNC_ENVIRONMENT         = var.environment
+      PSCNC_CRYPTO_BACKEND      = "kms"
+      PSCNC_KMS_CA_KEY_ID       = var.kms_ca_key_arn
+      PSCNC_CRL_BUCKET          = aws_s3_bucket.crl.id
+      PSCNC_CRL_OBJECT_KEY      = var.crl_object_key
+      PSCNC_CRL_VALIDITY_HOURS  = tostring(var.crl_validity_hours)
+      PSCNC_CRL_DISTRIBUTION_ID = aws_cloudfront_distribution.crl.id
+      PSCNC_SECOPS_TOPIC_ARN    = var.secops_topic_arn
     }
   }
 

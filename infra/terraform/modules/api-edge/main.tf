@@ -286,7 +286,7 @@ resource "aws_cognito_user_pool_client" "dashboard" {
     refresh_token = "hours"
   }
 
-  explicit_auth_flows = ["ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
-  enable_token_revocation = true
+  explicit_auth_flows           = ["ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
+  enable_token_revocation       = true
   prevent_user_existence_errors = "ENABLED"
 }
