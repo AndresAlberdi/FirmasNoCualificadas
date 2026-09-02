@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     # actos excluidos (ADR-0008).
     jurisdiction: str = DEFAULT_JURISDICTION
 
+    # Inquilinos con claves propias en este despliegue. De acá sale el documento
+    # de claves públicas: un inquilino que no figure no puede sellar actas ni ver
+    # su clave publicada, de modo que la lista es también un control de alta.
+    tenant_ids: list[str] = Field(default_factory=list)
+
     # --- AWS -----------------------------------------------------------------
     aws_region: str = Field(default="us-east-1", alias="AWS_REGION")
     kms_ca_key_id: str = ""

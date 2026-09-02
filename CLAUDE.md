@@ -274,6 +274,40 @@ nivel 2 **no puede ofrecerse en producción** hasta que se cumplan los tres bloq
 
 ---
 
+## El acta sellada (ADR-0006 §6)
+
+El artefacto que hace verificable al nivel 1, donde el documento no se modifica y lo único
+que prueba el acto es el registro. Un registro que nosotros podemos reescribir no prueba
+nada; el acta cierra ese hueco.
+
+```python
+sellada = ActaSealer(key_ring).seal(acta)
+sellada.jws              # sobre compacto, con `kid` = alias versionado
+sellada.payload_sha256   # SHA-256 del JSON canónico: es lo que se firmó
+```
+
+* **JSON canónico (RFC 8785).** Sin orden de claves determinista, dos serializaciones del
+  mismo acta dan hashes distintos y la verificación falla por motivos ajenos a la
+  integridad.
+* **El acta no lleva datos personales**: huellas y referencias. Puede entregarse al
+  inquilino y llegar a un juzgado.
+* **`GET /.well-known/fnc-keys.json`** publica las claves públicas, sin autenticación y a
+  propósito: un sello que solo nosotros sabemos comprobar no traslada confianza, la
+  concentra.
+
+**El detalle que rompe la interoperabilidad:** KMS devuelve ECDSA en **DER** y JWS `ES256`
+exige `R‖S` en crudo (RFC 7518 §3.4). Un sobre con el DER dentro parece correcto, lo
+verificaría nuestro propio código si compartiera el error, y **no lo acepta ninguna librería
+estándar**. Por eso la prueba de interoperabilidad usa `jwcrypto`, ajena al sellador:
+verificar con el mismo código que firma demuestra consistencia, no interoperabilidad.
+
+**Cuidado con `moto` al tocar esto:** ignora `MessageType="DIGEST"` y vuelve a hashear,
+mientras AWS firma el digest tal cual. Adaptar el código para que `moto` lo acepte rompería
+la interoperabilidad real. El sellado se prueba contra un doble fiel a la semántica
+documentada (T-10 en `docs/PENDIENTES.md`).
+
+---
+
 ## Puertos y adaptadores
 
 Los proveedores externos viven detrás de contratos:

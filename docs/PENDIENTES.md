@@ -70,6 +70,7 @@ los cite en producción. Una norma sin su PDF es una cita que nadie puede contra
 | T-07 | **Límite de tiempo en la extracción de texto del PDF** | `legal_guard` usa pypdf, que acumula CVE de denegación de servicio sin corrección disponible. Hoy se acota por tamaño (25 MiB) y por caracteres (200.000), pero un bucle infinito no lo detiene ninguno de los dos. Es la mitigación que falta para levantar la excepción del manifiesto |
 | T-08 | **WAF con limitación de tasa sobre CloudFront y egreso restringido** | Excepciones AWS-0011 y AWS-0104 del manifiesto, con vencimiento el 2026-12-02. El egreso definitivo depende de conocer el rango de la TSA (B-01) |
 | T-09 | **Las condiciones de las políticas de clave de KMS no están verificadas contra AWS real** | Ver el detalle abajo: es una limitación del simulador, no un olvido |
+| T-10 | **`moto` ignora `MessageType="DIGEST"` de `kms:Sign`** | Vuelve a aplicar SHA-256 sobre el digest, mientras AWS lo firma tal cual. Por eso el sellado de actas se prueba contra un doble fiel a la semántica documentada y no contra `moto`. Conviene reverificarlo contra `dev` real junto con la prueba de humo de T-09 |
 
 ### T-09 · Qué prueban y qué no prueban los tests de aislamiento por clave
 
