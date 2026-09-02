@@ -128,6 +128,21 @@ manifiesto declara `produccion: false`:
 **Ruleset de `main`**: exigir el check `compuerta-pr` y revisión por pares. Es lo que impide
 que un cambio entre sin pasar el pipeline.
 
+**Estado (2026-09-02):** el pipeline corrió por primera vez en el PR #9 y se corrigieron
+siete fallos reales. **Queda uno abierto**: `seguridad-estatica (infra) / IaC`, en el paso de
+Trivy config. No es reproducible localmente —con la misma versión de Trivy (0.70), la misma
+configuración, el mismo `scan-ref` y el archivo de excepciones descargado del propio run, el
+análisis termina sin hallazgos y con código 0—, y el registro del runner no muestra ningún
+hallazgo antes de salir con código 1. La hipótesis en pie es una diferencia en la base de
+datos de políticas que el runner descarga en cada ejecución.
+
+Se añadió al reusable un paso que repite el análisis en formato de tabla para dejar los
+hallazgos legibles en el registro, pero todavía no llegó a ejecutarse en un run observado.
+**Ese es el siguiente paso**: leer su salida y corregir el hallazgo concreto.
+
+**Hasta entonces el ruleset no se aplica.** Exigir un check que falla dejaría el repositorio
+bloqueado.
+
 **Orden que conviene respetar:** el check tiene que haber corrido y pasado **antes** de
 exigirlo. Aplicar el ruleset sobre un check que nunca se ejecutó deja el repositorio
 bloqueado esperando algo que puede fallar por causas todavía desconocidas, y obliga a
