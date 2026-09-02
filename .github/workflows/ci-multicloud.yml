@@ -254,7 +254,12 @@ jobs:
           # el dominio de la evidencia es de tipado estricto (CLAUDE.md).
           uv run mypy src
           uv run pytest --cov=src --cov-report=term --cov-fail-under="$COVERAGE_MIN" -q
-          uv run --with pip-audit pip-audit --strict
+          # `--skip-editable` omite el propio paquete del proyecto: `pip-audit`
+          # lo busca en PyPI, no lo encuentra y con `--strict` trata «no
+          # auditable» como hallazgo. Lo que interesa auditar son las
+          # dependencias, no el código que este mismo pipeline ya analiza con
+          # Semgrep, Trivy y CodeQL.
+          uv run --with pip-audit pip-audit --strict --skip-editable
 
       # ---- terraform ---------------------------------------------------------
       - name: Terraform

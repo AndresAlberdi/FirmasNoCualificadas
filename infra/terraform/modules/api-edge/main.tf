@@ -149,7 +149,10 @@ resource "aws_apigatewayv2_route" "proxy" {
   target    = "integrations/${aws_apigatewayv2_integration.signer.id}"
 }
 
+# El log de acceso registra la dirección IP y la cabecera del firmante, que son
+# evidencia pericial: se cifra con la misma clave que el resto de la evidencia.
 resource "aws_cloudwatch_log_group" "access" {
+  kms_key_id        = var.kms_key_arn
   name              = "/aws/apigateway/${local.name}"
   retention_in_days = var.log_retention_days
   tags              = var.tags
