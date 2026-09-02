@@ -15,8 +15,10 @@ import base64
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Protocol
 
 from asn1crypto import cms, tsp
+from pyhanko.sign.timestamps import TimeStamper
 
 from pscnc.errors import TimestampError
 from pscnc.logging_setup import get_logger
@@ -33,6 +35,19 @@ class TimestampResult:
     gen_time: datetime
     serial_number: str
     certificate_chain_pem: list[str]
+
+
+class TimeStamperDelegate(Protocol):
+    """Contrato mínimo del sellador subyacente.
+
+    Lo cumple tanto el ``HTTPTimeStamper`` de pyHanko como el sellador de
+    pruebas que se inyecta en los tests; declararlo evita tipar el delegado
+    como ``object`` y perder la verificación de la única llamada que se le hace.
+    """
+
+    async def async_timestamp(self, message_digest: bytes, md_algorithm: str) -> cms.ContentInfo:
+        """Solicita un token RFC 3161 para el digest indicado."""
+        ...
 
 
 def _pem(der: bytes) -> str:
@@ -66,7 +81,7 @@ def parse_timestamp_token(token: cms.ContentInfo, *, provider_name: str) -> Time
     )
 
 
-class RecordingTimeStamper:
+class RecordingTimeStamper(TimeStamper):
     """Envoltorio del sellador de pyHanko que retiene el último token obtenido.
 
     pyHanko incrusta el token en el PDF pero no lo devuelve; se intercepta aquí
@@ -83,7 +98,7 @@ class RecordingTimeStamper:
         password: str | None = None,
         timeout: int = 10,
         max_retries: int = 3,
-        delegate: object | None = None,
+        delegate: TimeStamperDelegate | None = None,
     ) -> None:
         # `delegate` permite inyectar un sellador de pruebas; en producción siempre
         # es nulo y se construye el cliente HTTP contra la TSA cualificada.
@@ -95,10 +110,13 @@ class RecordingTimeStamper:
 
             from pyhanko.sign.timestamps import HTTPTimeStamper
 
-            auth = (username, password) if username else None
+            auth = (username, password or "") if username else None
             delegate = HTTPTimeStamper(
                 url=url, https=url.startswith("https"), auth=auth, timeout=timeout
             )
+
+        # pyHanko no anota el constructor de `TimeStamper`; la llamada es correcta.
+        super().__init__()  # type: ignore[no-untyped-call]
 
         self._delegate = delegate
         self._provider_name = provider_name

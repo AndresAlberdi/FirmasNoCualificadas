@@ -62,7 +62,7 @@ class IssuedCertificate:
 
     @property
     def certificate_der(self) -> bytes:
-        return self.certificate.dump()
+        return bytes(self.certificate.dump())
 
     @property
     def certificate_pem(self) -> str:

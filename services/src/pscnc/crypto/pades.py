@@ -40,8 +40,18 @@ class VisualSignatureSpec:
     height: float = 60.0
 
     @property
-    def box(self) -> tuple[float, float, float, float]:
-        return (self.x, self.y, self.x + self.width, self.y + self.height)
+    def box(self) -> tuple[int, int, int, int]:
+        """Caja del campo de firma en puntos PDF, redondeada a entero.
+
+        pyHanko exige enteros. La fracción de punto (1/72 de pulgada) no tiene
+        efecto visible y la API pública conserva los valores en coma flotante.
+        """
+        return (
+            round(self.x),
+            round(self.y),
+            round(self.x + self.width),
+            round(self.y + self.height),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,14 +155,14 @@ class PadesSigner:
         from pyhanko.sign import fields, signers
         from pyhanko.sign.fields import SigSeedSubFilter
 
-        try:
-            from pyhanko.sign.general import SimpleCertificateStore
-        except ImportError:  # pyHanko ≥ 0.25 reexporta desde el validador
-            from pyhanko_certvalidator.registry import (
-                SimpleCertificateStore,  # type: ignore[no-redef]
-            )
+        # Desde pyHanko 0.25 el almacén de certificados vive en el validador;
+        # el pyproject ya exige esa versión mínima, así que no hay que sondear.
+        from pyhanko_certvalidator.registry import SimpleCertificateStore
 
-        cert_registry = SimpleCertificateStore.from_certs([self._ca.ca_certificate])
+        # `from_certs` no está anotada en el validador de pyHanko.
+        cert_registry = SimpleCertificateStore.from_certs(  # type: ignore[no-untyped-call]
+            [self._ca.ca_certificate]
+        )
         signer = signers.SimpleSigner(
             signing_cert=emitido.certificate,
             signing_key=emitido.private_key_info,

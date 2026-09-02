@@ -132,7 +132,7 @@ def build_crl(
         revoked_entries=len(entradas),
         next_update_hours=validity_hours,
     )
-    return lista.dump()
+    return bytes(lista.dump())
 
 
 def publicar(contenido: bytes, *, bucket: str, key: str, distribution_id: str = "") -> None:

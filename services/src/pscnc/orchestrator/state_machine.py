@@ -134,7 +134,7 @@ class SigningService:
             metadatos["compliance_text_extraction"] = "fallida"
 
         item = AuditTrailItem(
-            **AuditTrailItem.build_keys(  # type: ignore[arg-type]
+            **AuditTrailItem.build_keys(
                 transaction_id=transaction_id,
                 national_id=identidad.national_id,
                 b2b_client_id=context.b2b_client_id,

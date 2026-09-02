@@ -18,7 +18,7 @@ from decimal import Decimal
 from typing import Any
 
 import boto3
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import ConditionBase, Key
 from botocore.config import Config as BotoConfig
 from botocore.exceptions import ClientError
 
@@ -156,7 +156,7 @@ class AuditTrailRepository:
         limite: int = 50,
     ) -> list[AuditTrailItem]:
         """Lista transacciones del inquilino autenticado, ordenadas por fecha descendente."""
-        condicion = Key("GSI2PK").eq(f"CLIENT#{context.b2b_client_id}")
+        condicion: ConditionBase = Key("GSI2PK").eq(f"CLIENT#{context.b2b_client_id}")
         if desde and hasta:
             condicion = condicion & Key("GSI2SK").between(desde.isoformat(), hasta.isoformat())
         elif desde:

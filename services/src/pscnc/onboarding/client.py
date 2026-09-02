@@ -122,7 +122,7 @@ class SandboxOnboardingClient:
                 national_id=self._national_id,
                 first_name="Firmante",
                 last_name="De Prueba",
-                birth_date="1985-03-14",  # type: ignore[arg-type]
+                birth_date="1985-03-14",
                 ocr_mrz_raw="IDPRY4829153<<<<<<<<<<<<<<<<8503140M3001019PRY<<<<<<<<<<<8",
                 ocr_confidence=0.99,
                 facial_match_score=0.985,
