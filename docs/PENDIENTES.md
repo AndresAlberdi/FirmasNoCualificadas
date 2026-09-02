@@ -126,8 +126,12 @@ manifiesto declara `produccion: false`:
 (`STAGING_URL`, `PROD_URL` y las de la nube) quedan para cuando exista la cuenta.
 
 **Ruleset de `main`**: exigir el check `compuerta-pr` y revisión por pares. Es lo que impide
-que un cambio entre sin pasar el pipeline. Está pendiente y es lo más importante de esta
-lista.
+que un cambio entre sin pasar el pipeline.
+
+**Orden que conviene respetar:** el check tiene que haber corrido y pasado **antes** de
+exigirlo. Aplicar el ruleset sobre un check que nunca se ejecutó deja el repositorio
+bloqueado esperando algo que puede fallar por causas todavía desconocidas, y obliga a
+depurar el pipeline con `main` ya protegido.
 
 ---
 
