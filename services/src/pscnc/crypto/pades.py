@@ -23,7 +23,7 @@ from typing import Any
 from jurisdictions import JurisdictionProfile
 from pscnc.crypto.ephemeral_ca import EphemeralCertificateAuthority, IssuedCertificate, SubjectData
 from pscnc.crypto.tsa import RecordingTimeStamper, TimestampResult
-from pscnc.errors import DocumentIntegrityError, SigningError
+from pscnc.errors import DocumentIntegrityError, SigningError, TimestampError
 from pscnc.logging_setup import get_logger
 
 logger = get_logger(__name__)
@@ -203,6 +203,14 @@ class PadesSigner:
         try:
             writer = IncrementalPdfFileWriter(entrada)
             pdf_signer.sign_pdf(writer, output=salida, in_place=False)
+        except TimestampError:
+            # El fallo del sellado se deja pasar tal cual, sin envolverlo: la causa
+            # es lo que decide qué puede hacer el llamador. Una autoridad de
+            # sellado caída es transitoria y admite reintento; un fallo al
+            # construir la firma, no. Envolver ambos en el mismo error obligaría a
+            # tratarlos igual, y el tenant no puede distinguirlos por el mensaje.
+            logger.error("pades_timestamp_failed")
+            raise
         except Exception as exc:
             logger.error("pades_signature_failed", error=str(exc))
             raise SigningError("No se pudo aplicar la firma PAdES al documento") from exc
@@ -218,6 +226,7 @@ def build_timestamper_factory(
     password: str = "",
     timeout: int = 10,
     max_retries: int = 3,
+    qualified: bool = True,
 ) -> Any:
     """Construye una fábrica de selladores: uno nuevo por transacción.
 
@@ -229,6 +238,7 @@ def build_timestamper_factory(
         return RecordingTimeStamper(
             url,
             provider_name=provider_name,
+            qualified=qualified,
             username=username or None,
             password=password or None,
             timeout=timeout,

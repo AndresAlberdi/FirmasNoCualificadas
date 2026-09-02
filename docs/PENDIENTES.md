@@ -61,6 +61,7 @@ los cite en producción. Una norma sin su PDF es una cita que nadie puede contra
 
 | # | Pendiente | Por qué se difiere |
 | :-- | :---- | :---- |
+| T-13 | **La CA raíz autofirmada de `dev` se genera a mano, no con Terraform** | El encargo preveía generarla en la IaC. Hoy la producen las pruebas y el entorno local; falta el recurso de Terraform que la cree y la publique para `dev`. No bloquea el desarrollo del nivel 2 |
 | T-01 | **PAdES-B-LTA** para contratos de larga duración | Exige recolectar la cadena completa de validación (OCSP/CRL) e incrustarla en `/DSS`. El nivel B-T ya es suficiente mientras el sellado de tiempo esté garantizado (ADR-0004) |
 | T-02 | **Habilitación comercial de la jurisdicción `BO`** | El perfil es estructural y está marcado `sin_validacion_legal`. Exige documentos fuente bolivianos y revisión legal local (ADR-0008) |
 | T-03 | **Dígito verificador de la cédula paraguaya** | La validación comprueba formato, no dígito verificador |

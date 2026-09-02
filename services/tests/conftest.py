@@ -190,3 +190,90 @@ def consentimiento() -> ConsentEvidence:
             )
         ],
     )
+
+
+# --------------------------------------------------------------- Nivel 2 ----
+def pdf_minimo() -> bytes:
+    """PDF de una página, sintético y sin datos personales."""
+    import io
+
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+
+    buffer = io.BytesIO()
+    lienzo = canvas.Canvas(buffer, pagesize=A4)
+    lienzo.drawString(72, 760, "Contrato de prestacion de servicios de consultoria")
+    lienzo.drawString(72, 740, "Documento de prueba sintetico - sin datos personales reales")
+    lienzo.showPage()
+    lienzo.save()
+    return buffer.getvalue()
+
+
+@pytest.fixture()
+def pdf_de_prueba() -> bytes:
+    return pdf_minimo()
+
+
+@pytest.fixture(scope="session")
+def tsa_material() -> tuple[object, object]:
+    """Certificado y clave de una autoridad de sellado de pruebas.
+
+    Es explícitamente **de prueba**: los artefactos que produce se marcan como
+    tales en el acta (`qualified: false`), porque un sello así acredita que el
+    sistema funciona, no la fecha cierta del acto.
+    """
+    from asn1crypto import keys as asn1_keys
+    from asn1crypto import x509 as asn1_x509
+
+    clave = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    nombre = cx509.Name(
+        [
+            cx509.NameAttribute(NameOID.COUNTRY_NAME, "PY"),
+            cx509.NameAttribute(NameOID.COMMON_NAME, "TSA de Pruebas"),
+        ]
+    )
+    ahora = datetime.now(UTC)
+    certificado = (
+        cx509.CertificateBuilder()
+        .subject_name(nombre)
+        .issuer_name(nombre)
+        .public_key(clave.public_key())
+        .serial_number(cx509.random_serial_number())
+        .not_valid_before(ahora - timedelta(days=1))
+        .not_valid_after(ahora + timedelta(days=365))
+        .add_extension(
+            cx509.ExtendedKeyUsage([cx509.oid.ExtendedKeyUsageOID.TIME_STAMPING]),
+            critical=True,
+        )
+        .sign(clave, hashes.SHA256())
+    )
+    return (
+        asn1_x509.Certificate.load(certificado.public_bytes(serialization.Encoding.DER)),
+        asn1_keys.PrivateKeyInfo.load(
+            clave.private_bytes(
+                encoding=serialization.Encoding.DER,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption(),
+            )
+        ),
+    )
+
+
+@pytest.fixture()
+def tsa_de_prueba(tsa_material: tuple[object, object]):  # type: ignore[no-untyped-def]
+    """Fábrica de selladores de prueba, marcados como no cualificados."""
+    from pyhanko.sign.timestamps import DummyTimeStamper
+
+    from pscnc.crypto.tsa import RecordingTimeStamper
+
+    tsa_cert, tsa_key = tsa_material
+
+    def _fabrica() -> RecordingTimeStamper:
+        return RecordingTimeStamper(
+            "",
+            provider_name="TSA de Pruebas",
+            qualified=False,
+            delegate=DummyTimeStamper(tsa_cert=tsa_cert, tsa_key=tsa_key),
+        )
+
+    return _fabrica

@@ -29,6 +29,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from jurisdictions import JurisdictionProfile, UnknownJurisdictionError, get_profile
+from pscnc.crypto.ephemeral_ca import SubjectData
+from pscnc.crypto.pades import PadesSigner, SignatureResult
+from pscnc.errors import TimestampError
 from pscnc.evidence.acta import ActaPayload, ActaSealer, DocumentReference, SealedActa
 from pscnc.logging_setup import get_logger
 from pscnc.models.motivos import RejectionReason
@@ -100,6 +103,9 @@ class Transaction:
     acta_jws: str | None = None
     acta_payload_sha256: str | None = None
     acta_key_alias: str | None = None
+    signed_document_sha256: str | None = None
+    signer_certificate_serial: str | None = None
+    timestamp_authority: str | None = None
 
 
 class TransactionRepository:
@@ -137,11 +143,18 @@ class TransactionService:
         sellador: ActaSealer,
         jurisdiccion_por_defecto: str,
         ttl_minutos: int = 60,
+        firmante_pades: PadesSigner | None = None,
+        environment: str = "prod",
     ) -> None:
         self._repo = repositorio
         self._sellador = sellador
         self._jurisdiccion_por_defecto = jurisdiccion_por_defecto
         self._ttl = timedelta(minutes=ttl_minutos)
+        # Sin firmante PAdES el nivel 2 no está disponible: se rechaza al abrir la
+        # transacción, no al confirmarla, para que el tenant no llegue con el
+        # documento a un callejón sin salida.
+        self._firmante_pades = firmante_pades
+        self._environment = environment
 
     # ------------------------------------------------------------- Crear ----
     def crear(self, *, tenant_id: str, peticion: CreateTransactionRequest) -> TransactionCreated:
@@ -157,14 +170,14 @@ class TransactionService:
                 detalle={"policy_version": peticion.identity_decision.policy_version},
             )
 
-        if peticion.service_level is ServiceLevel.PADES:
-            # El nivel 2 depende de condiciones externas que hoy no se cumplen
-            # (docs/PENDIENTES.md §1). Decirlo con un motivo propio evita que el
-            # tenant lo interprete como un fallo transitorio y reintente.
+        if peticion.service_level is ServiceLevel.PADES and self._firmante_pades is None:
+            # El nivel 2 depende de la CA y de la autoridad de sellado de tiempo
+            # (docs/PENDIENTES.md §1). Un motivo propio evita que el tenant lo
+            # interprete como un fallo transitorio y reintente.
             raise TransactionRejectedError(
                 RejectionReason.SERVICE_LEVEL_UNAVAILABLE,
-                "El nivel 2 exige la CA y la autoridad de sellado de tiempo en producción; "
-                "todavía no están disponibles.",
+                "El nivel 2 exige la CA intermedia y la autoridad de sellado de tiempo; "
+                "no están configuradas en este despliegue.",
                 detalle={"nivel_disponible": ServiceLevel.SEALED_ACTA.value},
             )
 
@@ -254,10 +267,15 @@ class TransactionService:
 
         self._verificar_otp(transaccion, peticion)
 
-        # Se sella primero y se persiste después: un acta entregada que no quedó
-        # asentada es peor que un error, porque el tenant cree tener una prueba
-        # que no podemos respaldar.
-        acta_sellada = self._sellar(transaccion, peticion, ahora)
+        # Nivel 2: se firma el documento antes de sellar el acta, para que el acta
+        # pueda referenciar la huella del PDF firmado y el certificado que la
+        # produjo. Si algo de esto falla, no hay acta ni transacción confirmada.
+        firma_pades = self._firmar_documento(transaccion, peticion)
+
+        # Se sella y después se persiste: un acta entregada que no quedó asentada
+        # es peor que un error, porque el tenant cree tener una prueba que no
+        # podemos respaldar.
+        acta_sellada = self._sellar(transaccion, peticion, ahora, firma_pades)
 
         transaccion.status = TransactionStatus.CONFIRMED
         transaccion.confirmed_at = ahora
@@ -265,6 +283,10 @@ class TransactionService:
         transaccion.acta_jws = acta_sellada.jws
         transaccion.acta_payload_sha256 = acta_sellada.payload_sha256
         transaccion.acta_key_alias = acta_sellada.key_alias
+        if firma_pades is not None:
+            transaccion.signed_document_sha256 = firma_pades.signed_sha256
+            transaccion.signer_certificate_serial = firma_pades.certificate.serial_number
+            transaccion.timestamp_authority = firma_pades.timestamp.provider_name
         self._repo.guardar(transaccion)
 
         logger.info(
@@ -282,6 +304,8 @@ class TransactionService:
             confirmed_at=ahora,
             acta=self._sello(transaccion),
             verification_code=transaccion.verification_code,
+            signed_document_sha256=transaccion.signed_document_sha256,
+            timestamp_authority=transaccion.timestamp_authority,
         )
 
     # --------------------------------------------------------- Artifacts ---
@@ -390,8 +414,80 @@ class TransactionService:
             transaction_id=transaccion.transaction_id,
         )
 
+    def _firmar_documento(
+        self, transaccion: Transaction, peticion: ConfirmTransactionRequest
+    ) -> SignatureResult | None:
+        """Aplica la firma PAdES del nivel 2, o devuelve ``None`` en el nivel 1.
+
+        **Regla inviolable 12: sin fecha cierta no hay firma.** Si la autoridad de
+        sellado de tiempo falla, la transacción falla completa y no se degrada a
+        PAdES-B-B. El motivo es concreto: el certificado del firmante vive quince
+        minutos, así que un validador que lo comprueba después lo encuentra
+        expirado; lo único que acredita que la firma se produjo dentro de esa
+        ventana es el sello de tiempo. Una firma sin él es inverificable apenas
+        expira el certificado, y entregarla sería entregar algo que parece prueba
+        y no lo es.
+        """
+        if transaccion.service_level is not ServiceLevel.PADES:
+            return None
+
+        if peticion.document_content is None:
+            raise TransactionRejectedError(
+                RejectionReason.DOCUMENT_REQUIRED,
+                "El nivel 2 firma los bytes del documento: envíe `document_content`.",
+                transaction_id=transaccion.transaction_id,
+            )
+
+        # El certificado nombra a una persona: emitir uno sin nombre ni documento
+        # produciría una firma que no identifica a nadie, que es peor que no
+        # firmar. El dato lo aporta el tenant, que es quien verificó la identidad.
+        if not peticion.signer_common_name or not peticion.signer_national_id:
+            raise TransactionRejectedError(
+                RejectionReason.INCOMPLETE_IDENTITY_DECISION,
+                "El nivel 2 emite un certificado a nombre del firmante: envíe "
+                "`signer_common_name` y `signer_national_id`.",
+                transaction_id=transaccion.transaction_id,
+            )
+
+        perfil_id = self._perfil(transaccion.jurisdiction)
+        try:
+            perfil_id.validate_national_id(
+                perfil_id.document_types[0].code, peticion.signer_national_id
+            )
+        except ValueError as exc:
+            raise TransactionRejectedError(
+                RejectionReason.INVALID_IDENTITY_DOCUMENT,
+                str(exc),
+                transaction_id=transaccion.transaction_id,
+            ) from exc
+
+        assert self._firmante_pades is not None  # comprobado al crear la transacción
+
+        perfil = self._perfil(transaccion.jurisdiction)
+        try:
+            return self._firmante_pades.sign(
+                peticion.document_content,
+                SubjectData.for_jurisdiction(
+                    perfil,
+                    common_name=peticion.signer_common_name,
+                    national_id=peticion.signer_national_id,
+                    transaction_id=transaccion.transaction_id,
+                ),
+            )
+        except TimestampError as exc:
+            raise TransactionRejectedError(
+                RejectionReason.TIMESTAMP_UNAVAILABLE,
+                "No se pudo obtener el sello de tiempo. La firma no se emite: sin fecha "
+                "cierta sería inverificable en cuanto expire el certificado del firmante.",
+                transaction_id=transaccion.transaction_id,
+            ) from exc
+
     def _sellar(
-        self, transaccion: Transaction, peticion: ConfirmTransactionRequest, ahora: datetime
+        self,
+        transaccion: Transaction,
+        peticion: ConfirmTransactionRequest,
+        ahora: datetime,
+        firma_pades: SignatureResult | None = None,
     ) -> SealedActa:
         """Construye el acta y la sella.
 
@@ -416,6 +512,26 @@ class TransactionService:
             ),
             evidence_sha256=evidencia,
             tenant_reference=transaccion.tenant_reference,
+            environment=self._environment,
+            # Los datos del nivel 2 se pasan explícitos y no con `**dict`: un
+            # diccionario dinámico pierde los tipos y el verificador deja de
+            # comprobar que el acta se arma bien, que es justo lo que no conviene
+            # dejar sin comprobar en un artefacto probatorio.
+            signed_document_sha256=(firma_pades.signed_sha256 if firma_pades is not None else ""),
+            signer_certificate_serial=(
+                firma_pades.certificate.serial_number if firma_pades is not None else ""
+            ),
+            timestamp_token_sha256=(
+                hashlib.sha256(firma_pades.timestamp.token_base64.encode()).hexdigest()
+                if firma_pades is not None
+                else ""
+            ),
+            timestamp_authority=(
+                firma_pades.timestamp.provider_name if firma_pades is not None else ""
+            ),
+            timestamp_qualified=(
+                firma_pades.timestamp.qualified if firma_pades is not None else True
+            ),
         )
         return self._sellador.seal(acta, sealed_at=ahora)
 

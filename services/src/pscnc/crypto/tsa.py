@@ -35,6 +35,11 @@ class TimestampResult:
     gen_time: datetime
     serial_number: str
     certificate_chain_pem: list[str]
+    #: ``False`` cuando el sello proviene de una TSA de pruebas. Viaja hasta el
+    #: acta y hasta el expediente: un sello de prueba acredita el funcionamiento
+    #: del sistema, no la fecha cierta del acto, y la diferencia tiene que ser
+    #: legible sin analizar el token.
+    qualified: bool = True
 
 
 class TimeStamperDelegate(Protocol):
@@ -56,7 +61,9 @@ def _pem(der: bytes) -> str:
     return "-----BEGIN CERTIFICATE-----\n" + "\n".join(lineas) + "\n-----END CERTIFICATE-----\n"
 
 
-def parse_timestamp_token(token: cms.ContentInfo, *, provider_name: str) -> TimestampResult:
+def parse_timestamp_token(
+    token: cms.ContentInfo, *, provider_name: str, qualified: bool = True
+) -> TimestampResult:
     """Extrae los datos periciales relevantes de un token RFC 3161."""
     try:
         signed_data = token["content"]
@@ -78,6 +85,7 @@ def parse_timestamp_token(token: cms.ContentInfo, *, provider_name: str) -> Time
         gen_time=gen_time,
         serial_number=serial,
         certificate_chain_pem=cadena,
+        qualified=qualified,
     )
 
 
@@ -99,6 +107,7 @@ class RecordingTimeStamper(TimeStamper):
         timeout: int = 10,
         max_retries: int = 3,
         delegate: TimeStamperDelegate | None = None,
+        qualified: bool = True,
     ) -> None:
         # `delegate` permite inyectar un sellador de pruebas; en producción siempre
         # es nulo y se construye el cliente HTTP contra la TSA cualificada.
@@ -121,6 +130,7 @@ class RecordingTimeStamper(TimeStamper):
         self._delegate = delegate
         self._provider_name = provider_name
         self._max_retries = max_retries
+        self._qualified = qualified
         self._last_token: cms.ContentInfo | None = None
 
     # pyHanko invoca este método durante el firmado.
@@ -159,4 +169,6 @@ class RecordingTimeStamper(TimeStamper):
     def last_result(self) -> TimestampResult:
         if self._last_token is None:
             raise TimestampError("No se obtuvo ningún token de sellado de tiempo")
-        return parse_timestamp_token(self._last_token, provider_name=self._provider_name)
+        return parse_timestamp_token(
+            self._last_token, provider_name=self._provider_name, qualified=self._qualified
+        )
