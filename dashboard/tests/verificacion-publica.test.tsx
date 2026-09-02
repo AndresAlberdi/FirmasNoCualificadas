@@ -80,7 +80,9 @@ async function prepararPanel(jws: string, onAuditar?: (detalle: string) => void)
   const usuario = userEvent.setup()
   render(<VerificacionPublica onAuditar={onAuditar} />)
   await usuario.click(screen.getByRole('button', { name: /cargar claves/i }))
-  await screen.findByText(new RegExp(KID.replace(/\//g, '\\/')))
+  // Coincidencia exacta: construir un `RegExp` a partir del `kid` obligaría a
+  // escapar sus metacaracteres, y escaparlos a medias es peor que no usarlo.
+  await screen.findByText(KID)
   await usuario.type(screen.getByLabelText(/acta sellada/i), jws)
   return usuario
 }
