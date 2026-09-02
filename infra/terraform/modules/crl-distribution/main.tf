@@ -195,6 +195,28 @@ resource "aws_lambda_function" "crl_publisher" {
   filename         = var.lambda_package_path
   source_code_hash = filebase64sha256(var.lambda_package_path)
 
+  # Las variables no llevan secretos, pero sí los identificadores de las claves y
+  # los buckets: se cifran con la CMK para que su lectura pase por la política de
+  # esa clave, igual que el resto de la infraestructura de evidencia.
+  kms_key_arn = var.kms_evidence_key_arn
+
+  # Traza distribuida: cuando una publicación de CRL falla, lo que hace falta es
+  # ver dónde, y sin trazas hay que deducirlo de los registros.
+  tracing_config {
+    mode = "Active"
+  }
+
+  # Cola de descarte: una invocación fallida que se pierde deja la CRL vencida
+  # sin que nadie se entere, y un validador que no puede comprobar la revocación
+  # rechaza la firma.
+  dead_letter_config {
+    target_arn = aws_sqs_queue.crl_dlq.arn
+  }
+
+  # Un pico de invocaciones sobre esta función no debe consumir la concurrencia
+  # de la cuenta: publicar la CRL es una tarea programada, no un servicio.
+  reserved_concurrent_executions = 2
+
   environment {
     variables = {
       PSCNC_ENVIRONMENT         = var.environment
@@ -250,4 +272,44 @@ resource "aws_cloudwatch_metric_alarm" "publisher_failed" {
   }
   alarm_actions = [var.secops_topic_arn]
   tags          = var.tags
+}
+
+
+###############################################################################
+# Cola de descarte de la publicación de CRL
+###############################################################################
+
+resource "aws_sqs_queue" "crl_dlq" {
+  name = "pscnc-crl-publisher-dlq-${var.environment}"
+
+  # La clave de evidencia: el mensaje descartado lleva el contexto de la
+  # invocación fallida.
+  kms_master_key_id                 = var.kms_evidence_key_arn
+  kms_data_key_reuse_period_seconds = 300
+
+  # Catorce días: tiempo de sobra para que una guardia advierta el fallo y
+  # reprocese, sin retener mensajes indefinidamente.
+  message_retention_seconds = 1209600
+
+  tags = var.tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "crl_dlq_no_vacia" {
+  alarm_name          = "pscnc-crl-dlq-${var.environment}"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  namespace           = "AWS/SQS"
+  period              = 300
+  statistic           = "Maximum"
+  threshold           = 0
+  alarm_description   = "La publicación de la CRL falló: un validador que no pueda comprobar la revocación rechazará la firma"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [var.secops_topic_arn]
+
+  dimensions = {
+    QueueName = aws_sqs_queue.crl_dlq.name
+  }
+
+  tags = var.tags
 }

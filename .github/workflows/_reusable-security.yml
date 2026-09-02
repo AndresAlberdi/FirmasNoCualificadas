@@ -93,6 +93,11 @@ jobs:
       semgrep_exclude: ${{ steps.excepciones.outputs.semgrep_exclude }}
       pip_ignore: ${{ steps.excepciones.outputs.pip_ignore }}
       hay_excepciones: ${{ steps.excepciones.outputs.hay_excepciones }}
+      # Identificador del componente dentro del run. Sin él, todos los
+      # componentes de la matriz suben el artifact de excepciones con el
+      # mismo nombre: gana el primero y los demás descargan las excepciones
+      # de OTRO componente, de modo que las suyas no se aplican.
+      slug: ${{ steps.excepciones.outputs.slug }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -150,7 +155,8 @@ jobs:
           set -euo pipefail
           mkdir -p excepciones-generadas
           python3 - <<'PY'
-          import datetime as dt, os, pathlib, yaml
+          import datetime as dt
+          import re, os, pathlib, yaml
           hoy = dt.date.today()
           ruta = os.path.normpath(os.environ["RUTA"])
           m = {}
@@ -189,6 +195,9 @@ jobs:
                   # final impide que la excepción coincida jamás.
                   gitleaks.append(f"# vence {vence}: {e['justificacion']}")
                   gitleaks.append(i)
+          # El identificador se deriva de la ruta del componente: es lo único
+          # que distingue a dos ejecuciones del mismo reusable dentro de un run.
+          slug = re.sub(r"[^a-zA-Z0-9]+", "-", ruta).strip("-") or "raiz"
           d = pathlib.Path("excepciones-generadas")
           (d / "trivyignore.yaml").write_text(
               "# Generado por _reusable-security.yml desde .devsecops.yml. NO editar ni versionar.\n"
@@ -198,6 +207,7 @@ jobs:
               "# Generado desde .devsecops.yml (fingerprints commit:archivo:regla:linea). NO versionar.\n"
               + "".join(l + "\n" for l in gitleaks), encoding="utf-8")
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"slug={slug}\n")
               out.write(f"checkov_skip={','.join(checkov)}\n")
               out.write(f"semgrep_exclude={' '.join(semgrep)}\n")
               out.write(f"pip_ignore={' '.join(pip)}\n")
@@ -212,7 +222,7 @@ jobs:
       - name: Publicar archivos de excepciones generados
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: excepciones-generadas-${{ github.run_id }}-${{ github.run_attempt }}-${{ hashFiles('.devsecops.yml') || 'sin-manifiesto' }}
+          name: excepciones-generadas-${{ github.run_id }}-${{ github.run_attempt }}-${{ steps.excepciones.outputs.slug }}
           path: excepciones-generadas/
           retention-days: 1
           overwrite: true
@@ -253,7 +263,7 @@ jobs:
       - name: Descargar excepciones generadas (.gitleaksignore)
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          name: excepciones-generadas-${{ github.run_id }}-${{ github.run_attempt }}-${{ hashFiles('.devsecops.yml') || 'sin-manifiesto' }}
+          name: excepciones-generadas-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.preparar.outputs.slug }}
           path: excepciones-generadas
 
       - name: Aplicar .gitleaksignore generado
@@ -369,7 +379,7 @@ jobs:
       - name: Descargar excepciones generadas (.trivyignore.yaml)
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          name: excepciones-generadas-${{ github.run_id }}-${{ github.run_attempt }}-${{ hashFiles('.devsecops.yml') || 'sin-manifiesto' }}
+          name: excepciones-generadas-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.preparar.outputs.slug }}
           path: excepciones-generadas
 
       - name: Resolver configuración de Trivy y aplicar .trivyignore.yaml generado
@@ -393,6 +403,9 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
           format: sarif
+          # Misma razón que en el análisis de configuración: sin esto el bloqueo
+          # se evalúa sobre todas las severidades y no sobre `bloquear_en`.
+          limit-severities-for-sarif: true
           output: trivy-fs.sarif
           trivy-config: ${{ steps.trivycfg.outputs.ruta }}
 
@@ -431,6 +444,15 @@ jobs:
           # shellcheck disable=SC2086
           if [[ -f requirements.txt ]]; then
             pip-audit -r requirements.txt --strict $IGNORAR
+          elif [[ -f uv.lock ]]; then
+            # Proyecto con uv: se audita el LOCKFILE exportado y no el entorno
+            # instalado. Auditar el entorno incluye el propio paquete del
+            # proyecto, que no está en PyPI, y bajo `--strict` «no auditable»
+            # cuenta como hallazgo: el paso falla siempre. El lock es además lo
+            # que se despliega, así que es lo que corresponde comprobar.
+            pipx run uv export --no-emit-project --format requirements-txt > /tmp/deps-auditoria.txt \
+              || uv export --no-emit-project --format requirements-txt > /tmp/deps-auditoria.txt
+            pip-audit -r /tmp/deps-auditoria.txt --strict $IGNORAR
           else
             # Proyecto con pyproject.toml: se instala y se audita el entorno
             python -m pip install --quiet . && pip-audit --strict $IGNORAR
@@ -483,7 +505,7 @@ jobs:
       - name: Descargar excepciones generadas (.trivyignore.yaml)
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          name: excepciones-generadas-${{ github.run_id }}-${{ github.run_attempt }}-${{ hashFiles('.devsecops.yml') || 'sin-manifiesto' }}
+          name: excepciones-generadas-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.preparar.outputs.slug }}
           path: excepciones-generadas
 
       - name: Aplicar .trivyignore.yaml generado
@@ -512,7 +534,31 @@ jobs:
           severity: ${{ inputs.bloquear_en }}
           exit-code: '1'
           format: sarif
+          # Sin esto, `trivy-action` construye el SARIF «with all severities» y
+          # ejecuta Trivy SIN `--severity`: el `exit-code: 1` pasa a evaluarse
+          # sobre TODAS las severidades, de modo que un hallazgo MEDIUM o LOW
+          # bloquea el pipeline aunque `bloquear_en` diga CRITICAL,HIGH. El
+          # control deja de hacer lo que su nombre dice, y el registro no lo
+          # explica: solo muestra el código de salida.
+          limit-severities-for-sarif: true
           output: trivy-config.sarif
+
+      # El paso anterior emite SARIF, de modo que cuando bloquea el registro solo
+      # muestra el código de salida y no QUÉ falló: hay que descargar el SARIF o
+      # adivinar. Este paso repite el análisis en formato de tabla, sin bloquear,
+      # únicamente para dejar los hallazgos legibles en el registro. Un control
+      # que bloquea sin decir por qué obliga a depurar a ciegas.
+      - name: Detalle legible de los hallazgos de Trivy config
+        if: always()
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_IGNOREFILE: .trivyignore.yaml
+        with:
+          scan-type: config
+          scan-ref: ${{ inputs.ruta }}
+          severity: ${{ inputs.bloquear_en }}
+          exit-code: '0'
+          format: table
 
       - name: Subir SARIF a Code Scanning (Modo A/B)
         if: inputs.subir_sarif && always()
@@ -521,8 +567,22 @@ jobs:
           sarif_file: trivy-config.sarif
           category: trivy-config
 
+      - name: ¿Checkov produjo SARIF?
+        id: sarif_checkov
+        if: always()
+        run: |
+          # Checkov omite el archivo cuando no hay ningún hallazgo, y el paso de
+          # subida falla con «Path does not exist», haciendo fallar el job entero
+          # por un análisis que pasó. Se comprueba antes de intentar subirlo.
+          if [[ -f resultados-checkov/results_sarif.sarif ]]; then
+            echo "existe=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "existe=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Checkov no generó SARIF: no hubo hallazgos que reportar."
+          fi
+
       - name: Subir SARIF de Checkov a Code Scanning (Modo A/B)
-        if: inputs.subir_sarif && always()
+        if: inputs.subir_sarif && always() && steps.sarif_checkov.outputs.existe == 'true'
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         with:
           sarif_file: resultados-checkov/results_sarif.sarif

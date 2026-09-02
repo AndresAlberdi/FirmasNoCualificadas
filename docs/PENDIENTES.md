@@ -71,8 +71,8 @@ los cite en producción. Una norma sin su PDF es una cita que nadie puede contra
 | T-04 | **Modo COMPLIANCE de S3 Object Lock no se puede simular fielmente** en pruebas locales | Se valida en el entorno `dev` real (ADR-0003) |
 | T-05 | **Alta automatizada de tenant** | Crear un tenant implica claves, alias y políticas de KMS: es una operación de infraestructura, no un registro en una tabla (ADR-0006) |
 | T-06 | **El panel B2B pasa de `static` a `node` en `.devsecops.yml`** | Hoy es un prototipo con datos simulados y sin suite de pruebas. Al convertirse en producto necesita Vitest y quedar sujeto al umbral de cobertura |
-| T-07 | **Límite de tiempo en la extracción de texto del PDF** | `legal_guard` usa pypdf, que acumula CVE de denegación de servicio sin corrección disponible. Hoy se acota por tamaño (25 MiB) y por caracteres (200.000), pero un bucle infinito no lo detiene ninguno de los dos. Es la mitigación que falta para levantar la excepción del manifiesto |
-| T-08 | **WAF con limitación de tasa sobre CloudFront y egreso restringido** | Excepciones AWS-0011 y AWS-0104 del manifiesto, con vencimiento el 2026-12-02. El egreso definitivo depende de conocer el rango de la TSA (B-01) |
+| T-07 | **Límite de tiempo en la extracción de texto del PDF** | Ya no hay CVE abiertas en pypdf —se actualizó a 6.16.2—, pero la mitigación sigue teniendo sentido por sí misma: `legal_guard` analiza un PDF que envía el tenant, y ni el límite de tamaño (25 MiB) ni el de caracteres (200.000) detienen un bucle infinito. Deja de ser urgente y pasa a ser defensa en profundidad |
+| T-08 | **WAF con limitación de tasa sobre CloudFront** | Excepción AWS-0011 del manifiesto, con vencimiento el 2026-12-02. **El egreso ya está restringido**: el grupo de seguridad declara destinos concretos —listas de prefijos de AWS y un rango configurable para la TSA— en lugar de abrir el puerto 443 entero, de modo que una exfiltración desde el contenedor no tiene salida. La lista de rangos externos está vacía hasta contratar la TSA (B-01), lo que impide que el nivel 2 opere: es lo que el ADR-0007 ya declara |
 | T-09 | **Las condiciones de las políticas de clave de KMS no están verificadas contra AWS real** | Ver el detalle abajo: es una limitación del simulador, no un olvido |
 | T-12 | **El modo `otp_mode: FNC_MANAGED` está declarado pero no implementado** | Exige el proveedor de mensajería. Hoy se rechaza con un motivo propio en lugar de fallar de forma ambigua. El primer tenant usa `TENANT_VERIFIED`, así que no bloquea su integración |
 | T-10 | **`moto` ignora `MessageType="DIGEST"` de `kms:Sign`** | Vuelve a aplicar SHA-256 sobre el digest, mientras AWS lo firma tal cual. Por eso el sellado de actas se prueba contra un doble fiel a la semántica documentada y no contra `moto`. Conviene reverificarlo contra `dev` real junto con la prueba de humo de T-09 |
@@ -126,8 +126,16 @@ manifiesto declara `produccion: false`:
 (`STAGING_URL`, `PROD_URL` y las de la nube) quedan para cuando exista la cuenta.
 
 **Ruleset de `main`**: exigir el check `compuerta-pr` y revisión por pares. Es lo que impide
-que un cambio entre sin pasar el pipeline. Está pendiente y es lo más importante de esta
-lista.
+que un cambio entre sin pasar el pipeline.
+
+**Estado (2026-09-02): el pipeline pasa por completo.** Corrió por primera vez en el PR #9,
+donde se corrigieron ocho fallos —cuatro de configuración del repositorio y cuatro defectos
+del propio estándar—. `compuerta-pr` termina en verde con 34 checks.
+
+**Orden que conviene respetar:** el check tiene que haber corrido y pasado **antes** de
+exigirlo. Aplicar el ruleset sobre un check que nunca se ejecutó deja el repositorio
+bloqueado esperando algo que puede fallar por causas todavía desconocidas, y obliga a
+depurar el pipeline con `main` ya protegido.
 
 ---
 

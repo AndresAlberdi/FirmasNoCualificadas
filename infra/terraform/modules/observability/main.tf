@@ -118,7 +118,12 @@ resource "aws_s3_bucket_policy" "trail" {
   policy = data.aws_iam_policy_document.trail_bucket.json
 }
 
+# El grupo de logs recibe los eventos de CloudTrail, incluidas todas las
+# operaciones de KMS: es la traza que hace auditable una firma. Se cifra con la
+# clave gestionada por el cliente para que su lectura quede sujeta a la política
+# de esa clave, igual que el bucket del espejo.
 resource "aws_cloudwatch_log_group" "trail" {
+  kms_key_id        = var.kms_key_arn
   name              = "/aws/cloudtrail/${local.name}"
   retention_in_days = var.log_retention_days
   tags              = var.tags

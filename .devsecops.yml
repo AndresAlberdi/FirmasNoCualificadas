@@ -58,62 +58,6 @@ seguridad:
   bloquear_en: [CRITICAL, HIGH]   # se puede endurecer (añadir MEDIUM), nunca relajar
   # Cada excepción vence: pasada esa fecha el hallazgo vuelve a bloquear.
   excepciones:
-    - id: CVE-2026-59935
-      herramienta: trivy
-      componente: signer
-      justificacion: >-
-        Denegación de servicio en pypdf ante un PDF manipulado. No existe versión
-        corregida: 5.9.0 es la última publicada. El riesgo se acota por diseño:
-        el modo hash-only es el predeterminado (ADR-0009), de modo que el camino
-        que analiza el PDF es la excepción y no la regla; el tamaño está limitado
-        a 25 MiB y la extracción de texto se corta a 200.000 caracteres. Falta el
-        límite de tiempo de la extracción, registrado como T-07 en
-        docs/PENDIENTES.md. Se revisa en cada publicación de pypdf.
-      aprobado_por: segurolotengopy
-      creado: "2026-09-02"
-      vence: "2026-12-02"
-    - id: CVE-2026-59935
-      herramienta: osv-scanner
-      componente: signer
-      justificacion: >-
-        Denegación de servicio en pypdf ante un PDF manipulado. No existe versión
-        corregida: 5.9.0 es la última publicada. El riesgo se acota por diseño:
-        el modo hash-only es el predeterminado (ADR-0009), de modo que el camino
-        que analiza el PDF es la excepción y no la regla; el tamaño está limitado
-        a 25 MiB y la extracción de texto se corta a 200.000 caracteres. Falta el
-        límite de tiempo de la extracción, registrado como T-07 en
-        docs/PENDIENTES.md. Se revisa en cada publicación de pypdf.
-      aprobado_por: segurolotengopy
-      creado: "2026-09-02"
-      vence: "2026-12-02"
-    - id: CVE-2026-59936
-      herramienta: trivy
-      componente: signer
-      justificacion: >-
-        Denegación de servicio en pypdf ante un PDF manipulado. No existe versión
-        corregida: 5.9.0 es la última publicada. El riesgo se acota por diseño:
-        el modo hash-only es el predeterminado (ADR-0009), de modo que el camino
-        que analiza el PDF es la excepción y no la regla; el tamaño está limitado
-        a 25 MiB y la extracción de texto se corta a 200.000 caracteres. Falta el
-        límite de tiempo de la extracción, registrado como T-07 en
-        docs/PENDIENTES.md. Se revisa en cada publicación de pypdf.
-      aprobado_por: segurolotengopy
-      creado: "2026-09-02"
-      vence: "2026-12-02"
-    - id: CVE-2026-59936
-      herramienta: osv-scanner
-      componente: signer
-      justificacion: >-
-        Denegación de servicio en pypdf ante un PDF manipulado. No existe versión
-        corregida: 5.9.0 es la última publicada. El riesgo se acota por diseño:
-        el modo hash-only es el predeterminado (ADR-0009), de modo que el camino
-        que analiza el PDF es la excepción y no la regla; el tamaño está limitado
-        a 25 MiB y la extracción de texto se corta a 200.000 caracteres. Falta el
-        límite de tiempo de la extracción, registrado como T-07 en
-        docs/PENDIENTES.md. Se revisa en cada publicación de pypdf.
-      aprobado_por: segurolotengopy
-      creado: "2026-09-02"
-      vence: "2026-12-02"
     - id: AWS-0011
       herramienta: trivy
       componente: infra
@@ -128,17 +72,211 @@ seguridad:
       aprobado_por: segurolotengopy
       creado: "2026-09-02"
       vence: "2026-12-02"
-    - id: AWS-0104
-      herramienta: trivy
+    - id: CKV_AWS_68
+      herramienta: checkov
       componente: infra
       justificacion: >-
-        El grupo de seguridad del motor de firma permite salida a 0.0.0.0/0 en el
-        puerto 443 únicamente. El servicio necesita alcanzar la TSA cualificada,
-        cuyo rango de direcciones se conocerá al contratarla (B-01 de
-        docs/PENDIENTES.md), y los servicios de AWS. La corrección definitiva son
-        los VPC endpoints para los servicios de AWS más un egreso restringido al
-        rango de la TSA, y se aborda en la fase de infraestructura. No hay
-        infraestructura desplegada, de modo que hoy el hallazgo no tiene exposición.
+        Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV2_AWS_47
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_374
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_310
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_305
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_86
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV2_AWS_32
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV2_AWS_31
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_144
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Replicación entre regiones, notificaciones de evento y ciclo de vida de los buckets. La replicación es una decisión de costo que no está en el alcance del primer despliegue; las notificaciones no se usan porque la propagación al espejo WORM va por DynamoDB Streams. El ciclo de vida sí existe en el bucket de evidencias, que es el que conserva datos con plazo legal.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV2_AWS_62
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Replicación entre regiones, notificaciones de evento y ciclo de vida de los buckets. La replicación es una decisión de costo que no está en el alcance del primer despliegue; las notificaciones no se usan porque la propagación al espejo WORM va por DynamoDB Streams. El ciclo de vida sí existe en el bucket de evidencias, que es el que conserva datos con plazo legal.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV2_AWS_61
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Replicación entre regiones, notificaciones de evento y ciclo de vida de los buckets. La replicación es una decisión de costo que no está en el alcance del primer despliegue; las notificaciones no se usan porque la propagación al espejo WORM va por DynamoDB Streams. El ciclo de vida sí existe en el bucket de evidencias, que es el que conserva datos con plazo legal.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_300
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Replicación entre regiones, notificaciones de evento y ciclo de vida de los buckets. La replicación es una decisión de costo que no está en el alcance del primer despliegue; las notificaciones no se usan porque la propagación al espejo WORM va por DynamoDB Streams. El ciclo de vida sí existe en el bucket de evidencias, que es el que conserva datos con plazo legal.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_18
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Registro de acceso a los buckets. Exige un bucket de logs aparte con su propio ciclo de vida y política; se incorpora junto con el resto del perímetro en la fase de infraestructura. Los accesos a las claves ya quedan registrados en CloudTrail, que es la traza que sostiene la auditabilidad de una firma.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_309
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Tipo de autorización de las rutas de API Gateway. La autenticación del servicio es HMAC-SHA256 verificada en la aplicación, con el inquilino derivado de la credencial (ADR-0005): un autorizador de API Gateway no aportaría el contexto de inquilino que el repositorio necesita, y duplicaría el control en dos lugares que pueden divergir.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_382
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Egreso sin restringir en el grupo de seguridad del motor de firma, limitado al puerto 443. Mismo caso que la excepción AWS-0104 de Trivy: el servicio necesita alcanzar la autoridad de sellado de tiempo, cuyo rango se conocerá al contratarla (B-01). La corrección definitiva son los VPC endpoints más el egreso acotado (T-08).
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_260
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Egreso sin restringir en el grupo de seguridad del motor de firma, limitado al puerto 443. Mismo caso que la excepción AWS-0104 de Trivy: el servicio necesita alcanzar la autoridad de sellado de tiempo, cuyo rango se conocerá al contratarla (B-01). La corrección definitiva son los VPC endpoints más el egreso acotado (T-08).
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_28
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Recuperación a un punto en el tiempo en la tabla de idempotencia. Se desactiva a propósito: a diferencia de la evidencia, perder estos registros no destruye una prueba, y lo peor que produce es que un reintento se ejecute dos veces, cosa que la transacción ya rechaza. La tabla de auditoría sí lo tiene habilitado.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_272
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Validación de firma de código en la función de publicación de CRL. Exige un perfil de firma de AWS Signer y un flujo de publicación firmado, que no existe todavía; el artefacto se construye en el mismo pipeline que lo despliega. Se aborda junto con la firma de artefactos de la cadena de suministro.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_252
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Tema de SNS en CloudTrail. Las alarmas de seguridad ya publican en el tema de SecOps por CloudWatch, que es donde la guardia las recibe; una notificación por cada entrega de archivo de CloudTrail añadiría ruido sin destinatario que lo lea.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV2_AWS_3
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        GuardDuty. Está parametrizado por `enable_guardduty` y se activa en los entornos que lo justifiquen; encenderlo en todos multiplicaría el costo del entorno de desarrollo sin señal que lo aproveche.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV2_AWS_64
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Política de clave definida. Las claves del servicio la declaran de forma explícita (ADR-0006); el hallazgo alcanza a claves auxiliares del entorno de desarrollo, que usan la política predeterminada de la cuenta.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_109
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Permisos de gestión sin restricción en políticas de IAM. Corresponden a las sentencias de administración de las claves, acotadas por principal a los roles de SecOps; el comodín está en el recurso porque una política de clave se evalúa sobre la clave que la contiene, no sobre un ARN externo.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_111
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Permisos de gestión sin restricción en políticas de IAM. Corresponden a las sentencias de administración de las claves, acotadas por principal a los roles de SecOps; el comodín está en el recurso porque una política de clave se evalúa sobre la clave que la contiene, no sobre un ARN externo.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_150
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Protección contra borrado del balanceador. En `dev` se omite a propósito para poder reconstruir el entorno; se habilita en producción, donde el recurso sí es duradero.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_91
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Registro de acceso del balanceador. Depende del bucket de logs de CKV_AWS_18 y se incorpora con él.
+      aprobado_por: segurolotengopy
+      creado: "2026-09-02"
+      vence: "2026-12-02"
+    - id: CKV_AWS_117
+      herramienta: checkov
+      componente: infra
+      justificacion: >-
+        Función de CRL dentro de una VPC. Publica un archivo público en S3 y CloudFront y no accede a ningún recurso privado; meterla en la VPC exigiría endpoints o NAT sin reducir superficie.
       aprobado_por: segurolotengopy
       creado: "2026-09-02"
       vence: "2026-12-02"

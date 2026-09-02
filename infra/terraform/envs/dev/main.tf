@@ -231,6 +231,7 @@ module "api_edge" {
   dashboard_callback_urls     = var.dashboard_callback_urls
   dashboard_logout_urls       = var.dashboard_logout_urls
   tags                        = local.common_tags
+  kms_key_arn                 = aws_kms_key.data.arn
 }
 
 # ------------------------------------------------------ Distribución de CRL --

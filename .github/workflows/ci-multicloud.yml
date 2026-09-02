@@ -254,7 +254,13 @@ jobs:
           # el dominio de la evidencia es de tipado estricto (CLAUDE.md).
           uv run mypy src
           uv run pytest --cov=src --cov-report=term --cov-fail-under="$COVERAGE_MIN" -q
-          uv run --with pip-audit pip-audit --strict
+          # Se audita el LOCKFILE y no el entorno instalado. Dos razones: el
+          # propio paquete del proyecto no está en PyPI y `--strict` trata
+          # «no auditable» como hallazgo, así que auditando el entorno el paso
+          # falla siempre; y lo que interesa comprobar es exactamente lo que el
+          # lock fija, que es lo que se despliega.
+          uv export --no-emit-project --format requirements-txt > /tmp/deps.txt
+          uv run --with pip-audit pip-audit --strict -r /tmp/deps.txt
 
       # ---- terraform ---------------------------------------------------------
       - name: Terraform

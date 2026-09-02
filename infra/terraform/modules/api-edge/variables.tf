@@ -95,3 +95,12 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "kms_key_arn" {
+  description = <<-EOT
+    Clave KMS con la que se cifra el grupo de logs de acceso. Ese log registra la
+    dirección IP y la cabecera del firmante, que son evidencia pericial: se cifra
+    con la misma clave que el resto de la evidencia.
+  EOT
+  type        = string
+}

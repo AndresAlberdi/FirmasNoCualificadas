@@ -145,3 +145,27 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "aws_service_prefix_list_ids" {
+  description = <<-EOT
+    Listas de prefijos gestionadas de los servicios de AWS que el servicio
+    alcanza (S3, DynamoDB). Se usan en lugar de rangos fijos porque AWS las
+    mantiene al día; un rango escrito a mano queda obsoleto sin aviso.
+  EOT
+  type        = list(string)
+  default     = []
+}
+
+variable "external_https_cidr_blocks" {
+  description = <<-EOT
+    Rangos externos que el servicio puede alcanzar por HTTPS: la autoridad de
+    sellado de tiempo y el proveedor de identidad del inquilino. Vacío mientras
+    la TSA no esté contratada (B-01), lo que impide que el nivel 2 opere — que es
+    lo que el ADR-0007 ya declara.
+
+    Declarar destinos concretos en lugar de abrir el puerto entero es lo que hace
+    que una exfiltración desde el contenedor no tenga salida.
+  EOT
+  type        = list(string)
+  default     = []
+}
