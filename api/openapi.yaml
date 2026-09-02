@@ -503,6 +503,24 @@ components:
             maxLength: 500
           - type: 'null'
           title: Signer User Agent
+        document_content:
+          anyOf:
+          - type: string
+            contentMediaType: application/octet-stream
+          - type: 'null'
+          title: Document Content
+        signer_common_name:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Signer Common Name
+        signer_national_id:
+          anyOf:
+          - type: string
+            maxLength: 30
+          - type: 'null'
+          title: Signer National Id
       additionalProperties: false
       type: object
       required:

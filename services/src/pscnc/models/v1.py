@@ -189,6 +189,22 @@ class ConfirmTransactionRequest(_Base):
     signer_ip: str | None = Field(default=None, max_length=45)
     signer_user_agent: str | None = Field(default=None, max_length=500)
 
+    # --------------------------------------------------------- Solo nivel 2 --
+    # Estos tres campos existen únicamente para el nivel 2, que sí necesita los
+    # bytes para firmarlos. En el nivel 1 no se envían y el documento nunca llega
+    # al servicio: es la diferencia que hace que hash-only sea el modo por
+    # defecto (ADR-0009).
+
+    #: PDF a firmar, en base64. Se procesa en memoria y **no se conserva** salvo
+    #: que el tenant contrate custodia de forma explícita (ADR-0007).
+    document_content: bytes | None = None
+    #: Nombre del firmante para el `CN` del certificado efímero. Lo aporta el
+    #: tenant, que es quien verificó la identidad.
+    signer_common_name: str | None = Field(default=None, max_length=200)
+    #: Número de documento para el `serialNumber`, con el formato que exige la
+    #: jurisdicción.
+    signer_national_id: str | None = Field(default=None, max_length=30)
+
     @model_validator(mode="after")
     def _una_sola_via_de_otp(self) -> ConfirmTransactionRequest:
         """El OTP llega por una vía o por la otra, nunca por las dos.

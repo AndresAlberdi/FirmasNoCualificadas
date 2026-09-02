@@ -114,6 +114,7 @@ class EphemeralCertificateAuthority:
         policy_oid: str | None = None,
         backdate_minutes: int = 5,
         validity_minutes: int = 15,
+        environment: str = "prod",
     ) -> None:
         self._ca_cert = x509.Certificate.load(ca_certificate_der)
         self._ca_signer = ca_signer
@@ -121,6 +122,7 @@ class EphemeralCertificateAuthority:
         self._policy_oid = policy_oid or None
         self._backdate = timedelta(minutes=backdate_minutes)
         self._validity = timedelta(minutes=validity_minutes)
+        self._environment = environment
 
         if self._ca_cert.ca is False:
             raise SigningError(
@@ -131,6 +133,14 @@ class EphemeralCertificateAuthority:
     @property
     def ca_certificate(self) -> x509.Certificate:
         return self._ca_cert
+
+    @property
+    def is_production(self) -> bool:
+        return self._environment == "prod"
+
+    @property
+    def environment(self) -> str:
+        return self._environment
 
     @property
     def ca_serial_number(self) -> str:
@@ -187,6 +197,24 @@ class EphemeralCertificateAuthority:
         )
 
     # -------------------------------------------------------------- Interno --
+    def _organizational_unit(self, subject: SubjectData) -> str:
+        """Unidad organizativa del sujeto, con la marca de entorno si corresponde.
+
+        Fuera de producción el certificado se rotula en un campo que **cualquier
+        visor muestra sin desplegar extensiones**, incluido Adobe Reader. Es
+        deliberado: un artefacto de desarrollo firmado con una CA autofirmada y
+        una TSA de prueba no puede poder confundirse con uno real, y una marca
+        escondida en una extensión no lo impide — nadie la mira.
+        """
+        base = (
+            f"Firma Electronica No Cualificada - TX {subject.transaction_id}"
+            if subject.transaction_id
+            else "Firma Electronica No Cualificada"
+        )
+        if self.is_production:
+            return base
+        return f"[NO VALIDO - ENTORNO {self._environment.upper()}] {base}"
+
     def _signature_algorithm(self) -> algos.SignedDigestAlgorithm:
         nombre = ALGORITMOS_SOPORTADOS[self._ca_signer.signing_algorithm]
         if nombre == "rsassa_pss":
@@ -225,11 +253,7 @@ class EphemeralCertificateAuthority:
                 "country_name": subject.country,
                 "common_name": subject.common_name,
                 "serial_number": subject.serial_number,
-                "organizational_unit_name": (
-                    f"Firma Electronica No Cualificada - TX {subject.transaction_id}"
-                    if subject.transaction_id
-                    else "Firma Electronica No Cualificada"
-                ),
+                "organizational_unit_name": self._organizational_unit(subject),
             }
         )
 

@@ -188,9 +188,11 @@ todavía y la fase que las cubre es parte del trabajo, no un extra.**
     → `modules/retention-gate/tests/compuerta.tftest.hcl` (`make tf-test`)
 
 12. **Sin fecha cierta no hay firma de nivel 2.** Si la TSA falla, la transacción falla
-    completa: nunca se degrada en silencio a PAdES-B-B. Un certificado efímero sin sello de
-    tiempo es inverificable apenas expira.
-    → **PENDIENTE** (fase 7)
+    completa: nunca se degrada en silencio a PAdES-B-B. El certificado del firmante vive
+    quince minutos, así que un validador posterior lo encuentra expirado; lo único que
+    acredita que la firma se produjo dentro de esa ventana es el sello de tiempo. Una firma
+    sin él parece prueba y no lo es.
+    → `test_nivel_2.py::TestSinFechaCiertaNoHayFirma`
 
 ### Jurisdicción y contrato con el tenant
 
@@ -271,6 +273,18 @@ Agregar un país es agregar un paquete bajo `jurisdictions/` y una entrada en su
 | Qué hace | Acta de evidencia sellada con KMS | Lo del nivel 1 **más** firma PAdES con certificado efímero y sello RFC 3161 |
 | El PDF | **No se modifica** | Se firma incrementalmente y se devuelve; no se conserva salvo custodia contratada |
 | Qué verifica un tercero | El acta, con la clave pública publicada | El acta **y** el archivo, con cualquier validador PAdES |
+
+**Fuera de producción, todo artefacto va marcado.** El certificado lleva
+`[NO VALIDO - ENTORNO DEV]` en la unidad organizativa —un campo que cualquier visor muestra,
+no una extensión que nadie mira— y el acta declara `environment` y
+`not_valid_for_production`, más `timestamp.qualified: false` cuando el sello viene de una
+autoridad de pruebas. Un sello de prueba acredita que el sistema funciona, no la fecha
+cierta del acto.
+
+**Las firmas posteriores no invalidan la del cliente.** La firma cualificada del corredor
+—obligatoria por el art. 5 de la Res. SS.SG. 210/2025 en el caso del primer tenant— se
+aplica como actualización incremental sobre el mismo archivo. Si la invalidara, habría que
+elegir entre las dos, y ninguna es opcional.
 
 El recorrido del firmante es idéntico en ambos: el nivel es una propiedad del contrato. El
 nivel 2 **no puede ofrecerse en producción** hasta que se cumplan los tres bloqueantes de

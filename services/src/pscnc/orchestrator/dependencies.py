@@ -180,11 +180,51 @@ def build_transaction_service() -> TransactionService:
             "no puede sellarse ningún acta."
         )
 
+    # El firmante PAdES solo se construye si el despliegue tiene lo que el nivel
+    # 2 exige. Sin él, el nivel 2 se rechaza al abrir la transacción con un motivo
+    # propio, en vez de fallar a mitad de camino con el documento ya enviado.
+    firmante_pades: PadesSigner | None = None
+    if settings.tsa_url and settings.ca_cert_path:
+        firmante_pades = build_pades_signer(settings)
+
     return TransactionService(
         repositorio=TransactionRepository(),
         sellador=ActaSealer(build_tenant_key_ring(tenants[0], settings)),
         jurisdiccion_por_defecto=settings.jurisdiction,
         ttl_minutos=settings.session_ttl_minutes,
+        firmante_pades=firmante_pades,
+        environment=settings.environment,
+    )
+
+
+def build_pades_signer(settings: Settings) -> PadesSigner:
+    """Firmante del nivel 2, con la CA y la autoridad de sellado del despliegue.
+
+    Fuera de producción la autoridad se marca como **no cualificada**: su sello
+    acredita que el sistema funciona, no la fecha cierta del acto, y esa
+    diferencia viaja hasta el acta para que nadie tenga que deducirla.
+    """
+    autoridad = EphemeralCertificateAuthority(
+        ca_certificate_der=_cargar_certificado_ca(settings),
+        ca_signer=build_ca_signer(settings),
+        crl_url=settings.crl_distribution_url,
+        policy_oid=settings.cert_policy_oid,
+        backdate_minutes=settings.ephemeral_cert_backdate_minutes,
+        validity_minutes=settings.ephemeral_cert_validity_minutes,
+        environment=settings.environment,
+    )
+    return PadesSigner(
+        certificate_authority=autoridad,
+        timestamper_factory=build_timestamper_factory(
+            url=settings.tsa_url,
+            provider_name=settings.tsa_provider_name,
+            username=settings.tsa_username,
+            password=settings.tsa_password,
+            timeout=settings.tsa_timeout_seconds,
+            max_retries=settings.tsa_max_retries,
+            qualified=settings.is_production,
+        ),
+        jurisdiction=require_profile(settings.jurisdiction, environment=settings.environment),
     )
 
 

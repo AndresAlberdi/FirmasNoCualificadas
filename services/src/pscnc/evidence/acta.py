@@ -147,6 +147,17 @@ class ActaPayload:
     timestamp_token_sha256: str = ""
     #: Autoridad que emitió ese token.
     timestamp_authority: str = ""
+    #: ``False`` cuando el sello proviene de una TSA de pruebas.
+    timestamp_qualified: bool = True
+    #: Huella del documento ya firmado. Solo en nivel 2, donde los bytes cambian.
+    signed_document_sha256: str = ""
+    #: Número de serie del certificado efímero del firmante, para trazar la firma
+    #: hasta el certificado que la produjo sin tener que abrir el PDF.
+    signer_certificate_serial: str = ""
+    #: Entorno que produjo el acta. Se omite en producción y se declara en
+    #: cualquier otro: un acta de desarrollo no puede poder confundirse con una
+    #: real, y quien la reciba tiene que verlo sin analizar nada.
+    environment: str = "prod"
 
     def to_payload(self, *, sealed_at: datetime) -> dict[str, Any]:
         """Construye el diccionario que se canonicaliza y se sella."""
@@ -169,11 +180,22 @@ class ActaPayload:
         # presente y vacío es indistinguible de un dato que se perdió.
         if self.tenant_reference:
             payload["tenant_reference"] = self.tenant_reference
+        if self.signed_document_sha256:
+            payload["signed_document_sha256"] = self.signed_document_sha256
+        if self.signer_certificate_serial:
+            payload["signer_certificate_serial"] = self.signer_certificate_serial
         if self.timestamp_token_sha256:
             payload["timestamp"] = {
                 "token_sha256": self.timestamp_token_sha256,
                 "authority": self.timestamp_authority,
+                "qualified": self.timestamp_qualified,
             }
+        # La marca de entorno es lo contrario de un campo opcional: se omite en el
+        # caso normal y aparece cuando algo no es de producción, para que su
+        # presencia sea la señal.
+        if self.environment != "prod":
+            payload["environment"] = self.environment
+            payload["not_valid_for_production"] = True
         return payload
 
 
