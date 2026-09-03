@@ -1,15 +1,31 @@
-# FirmasNoCualificadas (FNC) — plataforma B2B de firma electrónica no cualificada
+# FirmasNoCualificadas (FNC) — motor de firma electrónica no cualificada, embebible
 
-SaaS multi-tenant que presta el servicio de firma electrónica no cualificada a terceros,
-operando como **Prestador de Servicios de Confianza No Cualificado (PSCNC)** bajo la
-Ley N.º 6822/2021 de Paraguay. Diseñado desde el primer día para salir de Paraguay: la
-jurisdicción es **configuración, no código** (ADR-0008).
+**FNC no presta el servicio de firma: lo entrega.** Es el motor que un cliente despliega en su
+propia infraestructura para firmar sus propias contrataciones. Diseñado desde el primer día
+para salir de Paraguay: la jurisdicción es **configuración, no código** (ADR-0008).
 
-**La distinción que define el encuadre legal del proyecto:** un servicio de confianza es el
-que se presta *habitualmente a cambio de una remuneración*. Un sistema que firma sus propias
-contrataciones es un mecanismo interno y no se registra; FNC presta el servicio a terceros y
-**por eso el registro ante el MIC no es opcional**. Todo lo que se construya acá vive del
-lado del prestador.
+**La distinción que define el encuadre legal del proyecto (ADR-0011).** La Ley N.º 6822/2021,
+art. 4.º num. 48, define el servicio de confianza como *«el servicio electrónico prestado
+habitualmente a cambio de una remuneración, consistente en: a) la creación, verificación y
+validación de firmas electrónicas […]»*, y su art. 15 dirige a los **prestadores** la
+obligación de comunicar la actividad. Quien firma sus propias contrataciones no presta un
+servicio de confianza: es un mecanismo interno y **no se registra**.
+
+**La condición de la que eso depende, y que gobierna el diseño:** la exención no la produce la
+palabra «interno» sino **quién crea la firma y a cambio de qué**. Si FNC alojara la plataforma
+y creara las firmas de sus clientes por una remuneración, volvería a prestar un servicio de
+confianza aunque cada cliente firmara lo suyo. Por eso el modelo de entrega es **despliegue
+del cliente**: su cuenta, sus claves, su operación. Cualquier decisión que mueva la operación
+hacia nuestro lado reabre la obligación de registro — y eso vale también para las decisiones
+de arquitectura, no solo para las comerciales.
+
+**Lo que no cambia, y es lo que sostiene el producto.** El art. 39.2 reserva la equivalencia
+con la firma manuscrita **solo a la firma cualificada**; el art. 40 remite, impugnada la
+autenticidad, al art. 404 del Código Civil; y el art. 63.1.b advierte que ni la firma
+cualificada hace fe respecto de la **fecha** sin sello de tiempo de un prestador cualificado.
+Lo que se exhibe entonces es el expediente de evidencias. Dejamos de tener obligaciones
+administrativas y conservamos íntegras las probatorias: el acta sellada y la pista de
+auditoría pasan a ser la *única* razón de ser del producto.
 
 ---
 

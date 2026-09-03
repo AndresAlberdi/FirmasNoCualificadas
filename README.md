@@ -1,14 +1,20 @@
-# FENC-PY · Plataforma B2B de Firma Electrónica No Cualificada (Paraguay)
+# FENC · Motor de Firma Electrónica No Cualificada, embebible
 
-Monorepo de la plataforma SaaS B2B que emite **Firmas Electrónicas No Cualificadas (FENC)**
-sobre documentos PDF bajo el estándar **PAdES-B-T / PAdES-B-LTA**, operada por un
-**Prestador de Servicios de Confianza No Cualificado (PSCNC)** constituido en la
-República del Paraguay conforme a la **Ley N.º 6822/2021**, el **Decreto N.º 7576/2022**
-y la **Resolución MIC N.º 262/2024** (perfil `DOC-ICPP-20 v2.0`).
+Monorepo del motor que emite **Firmas Electrónicas No Cualificadas (FENC)** sobre documentos
+PDF bajo el estándar **PAdES-B-T**, pensado para que **una organización lo despliegue en su
+propia infraestructura y firme sus propias contrataciones**.
+
+**No es un servicio de firma y no se presta a terceros.** La Ley N.º 6822/2021 define el
+servicio de confianza como el prestado *habitualmente a cambio de una remuneración*
+(art. 4.º num. 48) y dirige a los **prestadores** la obligación de comunicar su actividad
+(art. 15). Quien firma lo suyo es un mecanismo interno y no se registra. El encuadre completo,
+con la condición arquitectónica de la que depende, está en el **ADR-0011**.
 
 > El valor probatorio de una FENC no proviene del certificado, sino de la **pista de
-> auditoría**. Todo el diseño de este repositorio está subordinado a un objetivo:
-> sobrevivir a una pericia informática forense en sede civil paraguaya.
+> auditoría**. El art. 39.2 de la ley reserva la equivalencia con la firma manuscrita a la
+> firma *cualificada*: una firma no cualificada nunca la tiene, y lo que se exhibe cuando se
+> impugna su autenticidad —art. 40, que remite al art. 404 del Código Civil— es el expediente
+> de evidencias. Todo el diseño de este repositorio está subordinado a ese objetivo.
 
 ---
 
