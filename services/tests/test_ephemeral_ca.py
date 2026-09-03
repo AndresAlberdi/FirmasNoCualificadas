@@ -42,7 +42,8 @@ def autoridad(ca_certificate_der, ca_signer):  # type: ignore[no-untyped-def]
 def sujeto() -> SubjectData:
     return SubjectData.for_jurisdiction(
         get_profile("PY"),
-        common_name="Firmante De Prueba",
+        given_name="María José",
+        surname="Ruiz Díaz",
         national_id="4829153",
         transaction_id="9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
     )
@@ -65,7 +66,10 @@ def test_sujeto_conforme_al_perfil_nacional(autoridad, sujeto) -> None:  # type:
     emitido = autoridad.issue(sujeto)
     nombre = asn1_x509.Certificate.load(emitido.certificate_der).subject.native
 
-    assert nombre["common_name"] == "Firmante De Prueba"
+    # El `CN` se compone con el nombre y el apellido, que es como el perfil lo define.
+    assert nombre["common_name"] == "María José Ruiz Díaz"
+    assert nombre["given_name"] == "María José"
+    assert nombre["surname"] == "Ruiz Díaz"
     # Sigla del documento y no código de país: es lo que exige el perfil nacional.
     assert nombre["serial_number"] == "CI4829153"
     assert nombre["country_name"] == "PY"
@@ -137,7 +141,8 @@ def test_el_pasaporte_produce_una_sigla_distinta(autoridad) -> None:  # type: ig
     """Un certificado que dijera «CI» sobre un pasaporte afirmaría un documento falso."""
     con_pasaporte = SubjectData.for_jurisdiction(
         get_profile("PY"),
-        common_name="Firmante De Prueba",
+        given_name="María José",
+        surname="Ruiz Díaz",
         national_id="AB123456",
         document_type="PASAPORTE",
     )

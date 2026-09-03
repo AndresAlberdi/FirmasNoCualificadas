@@ -112,7 +112,8 @@ def firmante(ca_certificate_der, ca_signer, tsa_material):  # type: ignore[no-un
 def sujeto() -> SubjectData:
     return SubjectData.for_jurisdiction(
         get_profile("PY"),
-        common_name="Firmante De Prueba",
+        given_name="María José",
+        surname="Ruiz Díaz",
         national_id="4829153",
         transaction_id="9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
     )

@@ -120,7 +120,10 @@ def _confirmar(pdf: bytes, **cambios: Any) -> ConfirmTransactionRequest:
         "consent_statement_version": "p8-consentimiento-v3",
         "document_sha256": hashlib.sha256(pdf).hexdigest(),
         "document_content": pdf,
-        "signer_common_name": "Firmante De Prueba",
+        # Apellido compuesto a propósito: es el caso que rompe cualquier heurística
+        # de partición, y el que hace que el contrato pida los dos campos.
+        "signer_given_name": "María José",
+        "signer_surname": "Ruiz Díaz",
         "signer_national_id": "4829153",
     }
     base.update(cambios)
@@ -141,7 +144,8 @@ class TestArtefactosDeDesarrolloMarcados:
         emitido = autoridad.issue(
             SubjectData.for_jurisdiction(
                 get_profile("PY"),
-                common_name="Firmante De Prueba",
+                given_name="María José",
+                surname="Ruiz Díaz",
                 national_id="4829153",
                 transaction_id="tx-1",
             )
@@ -164,7 +168,8 @@ class TestArtefactosDeDesarrolloMarcados:
         emitido = autoridad.issue(
             SubjectData.for_jurisdiction(
                 get_profile("PY"),
-                common_name="Firmante De Prueba",
+                given_name="María José",
+                surname="Ruiz Díaz",
                 national_id="4829153",
                 transaction_id="tx-1",
             )
@@ -324,17 +329,60 @@ class TestContratoDelNivel2:
     def test_el_nivel_2_exige_los_datos_del_firmante(
         self, servicio: TransactionService, pdf_de_prueba: bytes
     ) -> None:
-        """Un certificado sin nombre firmaría sin identificar a nadie."""
+        """Un certificado sin documento firmaría sin identificar a nadie."""
         creada = servicio.crear(tenant_id=TENANT, peticion=_crear(pdf_de_prueba))
 
         with pytest.raises(TransactionRejectedError) as error:
             servicio.confirmar(
                 tenant_id=TENANT,
                 transaction_id=creada.transaction_id,
-                peticion=_confirmar(pdf_de_prueba, signer_common_name=None),
+                peticion=_confirmar(pdf_de_prueba, signer_national_id=None),
             )
 
         assert error.value.motivo is RejectionReason.INCOMPLETE_IDENTITY_DECISION
+
+    def test_el_nivel_2_no_deduce_el_apellido_de_una_sola_cadena(
+        self, servicio: TransactionService, pdf_de_prueba: bytes
+    ) -> None:
+        """Partirla resolvería «Juan Pérez» y fallaría con «María José Ruiz Díaz».
+
+        El fallo no se notaría: el certificado se emitiría afirmando un apellido que
+        nadie declaró. Se rechaza con un motivo propio (ADR-0010).
+        """
+        creada = servicio.crear(tenant_id=TENANT, peticion=_crear(pdf_de_prueba))
+
+        with pytest.raises(TransactionRejectedError) as error:
+            servicio.confirmar(
+                tenant_id=TENANT,
+                transaction_id=creada.transaction_id,
+                peticion=_confirmar(
+                    pdf_de_prueba,
+                    signer_given_name=None,
+                    signer_surname=None,
+                    signer_common_name="María José Ruiz Díaz",
+                ),
+            )
+
+        assert error.value.motivo is RejectionReason.INCOMPLETE_SIGNER_NAME
+
+    def test_el_certificado_lleva_el_nombre_y_el_apellido_por_separado(
+        self, autoridad: EphemeralCertificateAuthority
+    ) -> None:
+        """Los tres atributos de nombre que el perfil de certificado exige."""
+        emitido = autoridad.issue(
+            SubjectData.for_jurisdiction(
+                get_profile("PY"),
+                given_name="María José",
+                surname="Ruiz Díaz",
+                national_id="4829153",
+            )
+        )
+        nombre = emitido.certificate.subject.native
+
+        assert nombre["given_name"] == "María José"
+        assert nombre["surname"] == "Ruiz Díaz"
+        # El `CN` se compone: pedirlo aparte dejaría que los tres se contradigan.
+        assert nombre["common_name"] == "María José Ruiz Díaz"
 
     def test_el_documento_de_identidad_se_valida_contra_la_jurisdiccion(
         self, servicio: TransactionService, pdf_de_prueba: bytes
@@ -429,7 +477,8 @@ class TestFirmasInstitucionalesPosteriores:
             pdf_de_prueba,
             SubjectData.for_jurisdiction(
                 get_profile("PY"),
-                common_name="Firmante De Prueba",
+                given_name="María José",
+                surname="Ruiz Díaz",
                 national_id="4829153",
                 transaction_id="tx-cliente",
             ),
@@ -440,7 +489,8 @@ class TestFirmasInstitucionalesPosteriores:
             primera.signed_pdf,
             SubjectData.for_jurisdiction(
                 get_profile("PY"),
-                common_name="Corredor Autorizado",
+                given_name="Corredor",
+                surname="Autorizado",
                 national_id="1234567",
                 transaction_id="tx-corredor",
             ),
@@ -466,7 +516,8 @@ class TestFirmasInstitucionalesPosteriores:
             pdf_de_prueba,
             SubjectData.for_jurisdiction(
                 get_profile("PY"),
-                common_name="Firmante De Prueba",
+                given_name="María José",
+                surname="Ruiz Díaz",
                 national_id="4829153",
                 transaction_id="tx-1",
             ),

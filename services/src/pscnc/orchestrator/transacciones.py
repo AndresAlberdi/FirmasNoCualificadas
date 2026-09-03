@@ -454,14 +454,27 @@ class TransactionService:
                 transaction_id=transaccion.transaction_id,
             )
 
-        # El certificado nombra a una persona: emitir uno sin nombre ni documento
-        # produciría una firma que no identifica a nadie, que es peor que no
-        # firmar. El dato lo aporta el tenant, que es quien verificó la identidad.
-        if not peticion.signer_common_name or not peticion.signer_national_id:
+        # El certificado nombra a una persona: emitir uno sin documento produciría
+        # una firma que no identifica a nadie, que es peor que no firmar. El dato lo
+        # aporta el tenant, que es quien verificó la identidad.
+        if not peticion.signer_national_id:
             raise TransactionRejectedError(
                 RejectionReason.INCOMPLETE_IDENTITY_DECISION,
                 "El nivel 2 emite un certificado a nombre del firmante: envíe "
-                "`signer_common_name` y `signer_national_id`.",
+                "`signer_national_id`.",
+                transaction_id=transaccion.transaction_id,
+            )
+
+        # El nombre y el apellido son atributos distintos del certificado y llegan
+        # por separado. Partir una sola cadena resolvería «Juan Pérez» y fallaría
+        # con «María José Ruiz Díaz», y el error no se notaría: el certificado se
+        # emitiría afirmando un apellido que nadie declaró (ADR-0010).
+        if not peticion.signer_given_name or not peticion.signer_surname:
+            raise TransactionRejectedError(
+                RejectionReason.INCOMPLETE_SIGNER_NAME,
+                "El perfil de certificado exige el nombre y el apellido como atributos "
+                "distintos: envíe `signer_given_name` y `signer_surname`. No se deducen "
+                "de una sola cadena.",
                 transaction_id=transaccion.transaction_id,
             )
 
@@ -488,6 +501,8 @@ class TransactionService:
                 peticion.document_content,
                 SubjectData.for_jurisdiction(
                     perfil,
+                    given_name=peticion.signer_given_name,
+                    surname=peticion.signer_surname,
                     common_name=peticion.signer_common_name,
                     national_id=peticion.signer_national_id,
                     document_type=tipo_documento,

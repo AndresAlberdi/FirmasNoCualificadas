@@ -48,6 +48,13 @@ class SubjectData:
     exactamente lo que no puede pasar en un documento probatorio.
     """
 
+    #: Nombre de pila, exigido como atributo propio por el perfil de certificado.
+    given_name: str
+    #: Apellido, exigido como atributo propio por el perfil de certificado.
+    surname: str
+    #: Nombre completo. Se compone con los dos anteriores salvo que el inquilino
+    #: lo anule: el perfil lo define como «nombre y apellido», y pedirlo aparte
+    #: abriría la puerta a que los tres campos se contradigan entre sí.
     common_name: str
     national_id: str
     country: str
@@ -65,8 +72,10 @@ class SubjectData:
         cls,
         profile: JurisdictionProfile,
         *,
-        common_name: str,
+        given_name: str,
+        surname: str,
         national_id: str,
+        common_name: str | None = None,
         document_type: str | None = None,
         transaction_id: str = "",
         email: str | None = None,
@@ -81,7 +90,9 @@ class SubjectData:
         """
         tipo = document_type or profile.default_document_type.code
         return cls(
-            common_name=common_name,
+            given_name=given_name,
+            surname=surname,
+            common_name=common_name or f"{given_name} {surname}".strip(),
             national_id=national_id,
             country=profile.certificate_country,
             serial_prefix=profile.document_type(tipo).certificate_prefix,
@@ -322,6 +333,9 @@ class EphemeralCertificateAuthority:
             {
                 "country_name": subject.country,
                 "organization_name": subject.organization,
+                # El perfil exige los tres atributos de nombre por separado.
+                "surname": subject.surname,
+                "given_name": subject.given_name,
                 "common_name": subject.common_name,
                 "serial_number": subject.serial_number,
                 "organizational_unit_name": self._organizational_unit(subject),

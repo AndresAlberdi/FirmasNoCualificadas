@@ -7,7 +7,7 @@ hoy construye `services/src/pscnc/crypto/ephemeral_ca.py`.
 **Fuente:** `docs/diseno/normativa/doc-icpp-20-v2.0.pdf`, leído de primera mano. Última
 revisión: 2026-09-03.
 
-**Estado: parcialmente corregido.** De los seis apartamientos detectados, **P-01, P-02 y la
+**Estado: parcialmente corregido.** De los seis apartamientos detectados, **P-01, P-02, P-04 y la
 mayor parte de P-05 están resueltos** —el `serialNumber` deriva de la sigla del documento y el sujeto lleva los
 valores literales que fija el perfil— y P-03 quedó reducido a una sola pregunta abierta.
 Siguen pendientes P-04 y P-05. Ninguno afecta a `dev`, donde el
@@ -90,7 +90,7 @@ El identificador de transacción, que hoy viaja en la OU, hay que reubicarlo —
 prevé dónde. Candidatos: una extensión propia bajo nuestro arco OID, o el `User Notice` de
 `certificatePolicies`. **Es una decisión de diseño abierta.**
 
-### 2.4. `surname` y `givenName` ausentes — **obligatorios**
+### 2.4. `surname` y `givenName` ausentes — **corregido, con cambio de contrato (ADR-0010)**
 
 La norma los exige por separado (campos 6.5 y 6.6), además del `commonName`:
 

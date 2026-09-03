@@ -78,8 +78,8 @@ abierto, porque lo que hace falta es su Anexo.
 ## 4. Conformidad del certificado efímero con el `DOC-ICPP-20 v2.0`
 
 Apartamientos entre el perfil que la norma fija para el *certificado no cualificado de
-firma electrónica* (§4.1) y lo que emite `crypto/ephemeral_ca.py`. **P-01 y P-02 están
-corregidos**; queda lo de abajo. No
+firma electrónica* (§4.1) y lo que emite `crypto/ephemeral_ca.py`. **P-01, P-02, P-04 y la mayor parte de P-05
+están corregidos**; queda lo de abajo. No
 son alcance diferido: son **incumplimientos de campos marcados obligatorios**, detectados
 al leer el texto oficial. El análisis campo por campo, con lo que la norma además
 *confirma*, está en `docs/CONFORMIDAD-PERFIL-CERTIFICADO.md`.
@@ -90,7 +90,6 @@ producción, que ya estaba bloqueado por B-01 y B-02.
 | # | Apartamiento | Detalle |
 | :-- | :---- | :---- |
 | P-03 | **Falta decidir dónde viaja el identificador de transacción en producción** | Resuelto a medias: la OU ya vale el literal del perfil en producción y conserva la marca `[NO VALIDO - ENTORNO {ENV}]` fuera de ella, de modo que los dos entornos nunca emiten el mismo sujeto. Lo que queda es el identificador de transacción, que en producción ya no cabe en la OU. **No se perdió el vínculo**: el acta sellada registra el número de serie del certificado. Falta decidir si se reubica —extensión propia, `User Notice` de `certificatePolicies`— o si alcanza con el serial |
-| P-04 | **Faltan `surname` y `givenName`, obligatorios y separados del `commonName`** | **Cambia el contrato v1:** hoy llega `signer_common_name` como una sola cadena, y partirla por el espacio sería adivinar. Necesita ADR y versión del SDK |
 | P-05 | **`authorityInfoAccess` ausente, y no hay a qué apuntar** | Resuelto todo lo demás: `keyUsage` ya lleva `keyEncipherment`, `extendedKeyUsage` ya lleva `clientAuth`, y `certificatePolicies` ya emite el *CPS Pointer* y el *User Notice*. Queda el `authorityInfoAccess`, que **no se puede emitir con verdad hoy**: el campo apunta al método de acceso a la información de revocación —OCSP— y el servicio publica CRL, no OCSP. Declarar una URL que no se sirve sería una afirmación falsa en un documento probatorio. Exige decidir entre levantar un respondedor OCSP o publicar el certificado de la CA para un `caIssuers`, y en ambos casos es trabajo de infraestructura que además depende de B-02 |
 | P-06 | **El OID de *Document Signing* de Microsoft se conserva deliberadamente** | El perfil enumera dos OID en el `extendedKeyUsage` sin declarar la lista cerrada, y ese tercero es el que hace que Adobe reconozca el propósito del certificado. Quitarlo degradaría el producto por una regla que puede no existir. **Es una decisión de producto tomada bajo incertidumbre**, no una obligación legal: se revisa con la respuesta a L-05 |
 

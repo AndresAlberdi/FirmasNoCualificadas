@@ -17,7 +17,9 @@ Todos los datos son sintéticos.
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -420,6 +422,14 @@ class TestConstanciaPublica:
 
 
 # ------------------------------------------------------------- Motivos -----
+def _motivos_declarados_por_el_sdk() -> set[str]:
+    """Extrae la unión de literales de `RejectionReason` del SDK de TypeScript."""
+    tipos = Path(__file__).resolve().parents[2] / "sdk" / "typescript" / "src" / "types.ts"
+    contenido = tipos.read_text(encoding="utf-8")
+    bloque = contenido[contenido.index("export type RejectionReason") :]
+    return set(re.findall(r'"([A-Z_]+)"', bloque[: bloque.index(";")]))
+
+
 class TestMotivosEstables:
     def test_los_motivos_son_cadenas_estables(self) -> None:
         """El tenant programa contra estos valores: renombrarlos rompe su `match`."""
@@ -427,6 +437,27 @@ class TestMotivosEstables:
         assert RejectionReason.DOCUMENT_TAMPERED.value == "DOCUMENT_TAMPERED"
         assert (
             RejectionReason.TRANSACTION_ALREADY_CONFIRMED.value == "TRANSACTION_ALREADY_CONFIRMED"
+        )
+
+    def test_el_sdk_declara_todos_los_motivos(self) -> None:
+        """Un motivo que el SDK no declara es un `match` que el tenant no puede escribir.
+
+        La deriva entre los dos catálogos no rompe ninguna prueba por sí sola: el
+        servicio devuelve el motivo nuevo y el adaptador del tenant lo recibe como
+        un valor que su tipo no contempla. Se detecta acá o en producción.
+        """
+        declarados = _motivos_declarados_por_el_sdk()
+
+        faltantes = {m.value for m in RejectionReason} - declarados
+        assert not faltantes, f"El SDK no declara estos motivos: {sorted(faltantes)}"
+
+    def test_el_sdk_no_declara_motivos_inexistentes(self) -> None:
+        """El sentido inverso: un motivo que el servicio ya no emite es letra muerta."""
+        declarados = _motivos_declarados_por_el_sdk()
+
+        sobrantes = declarados - {m.value for m in RejectionReason}
+        assert not sobrantes, (
+            f"El SDK declara motivos que el servicio no emite: {sorted(sobrantes)}"
         )
 
     def test_ningun_motivo_es_a_la_vez_reintentable_y_terminal(self) -> None:
