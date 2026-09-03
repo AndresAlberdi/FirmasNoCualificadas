@@ -8,7 +8,7 @@
 ###############################################################################
 
 locals {
-  name = "pscnc-obs-${var.environment}"
+  name = "${var.resource_prefix}-obs-${var.environment}"
 }
 
 # ------------------------------------------------------ Canal de alertas -----
@@ -221,7 +221,7 @@ resource "aws_cloudwatch_log_metric_filter" "kms_sign" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "kms_sign_anomaly" {
-  alarm_name          = "pscnc-kms-sign-anomaly-${var.environment}"
+  alarm_name          = "${var.resource_prefix}-kms-sign-anomaly-${var.environment}"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
   metric_name         = "PscncKmsSignCalls"
@@ -249,7 +249,7 @@ resource "aws_cloudwatch_log_metric_filter" "kms_sign_unexpected_principal" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "kms_sign_unexpected_principal" {
-  alarm_name          = "pscnc-kms-sign-unexpected-principal-${var.environment}"
+  alarm_name          = "${var.resource_prefix}-kms-sign-unexpected-principal-${var.environment}"
   comparison_operator = "GreaterThanOrEqualToThreshold"
   evaluation_periods  = 1
   metric_name         = "PscncKmsSignUnexpectedPrincipal"
@@ -287,7 +287,7 @@ resource "aws_cloudwatch_log_metric_filter" "kms_key_lifecycle" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "kms_key_lifecycle" {
-  alarm_name          = "pscnc-kms-key-lifecycle-${var.environment}"
+  alarm_name          = "${var.resource_prefix}-kms-key-lifecycle-${var.environment}"
   comparison_operator = "GreaterThanOrEqualToThreshold"
   evaluation_periods  = 1
   metric_name         = "PscncKmsKeyLifecycleEvents"
@@ -316,7 +316,7 @@ resource "aws_cloudwatch_log_metric_filter" "kms_context_mismatch" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "kms_context_mismatch" {
-  alarm_name          = "pscnc-kms-context-mismatch-${var.environment}"
+  alarm_name          = "${var.resource_prefix}-kms-context-mismatch-${var.environment}"
   comparison_operator = "GreaterThanOrEqualToThreshold"
   evaluation_periods  = 1
   metric_name         = "PscncKmsContextMismatch"

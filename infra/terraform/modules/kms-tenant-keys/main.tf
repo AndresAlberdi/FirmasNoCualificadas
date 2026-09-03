@@ -31,7 +31,7 @@ data "aws_caller_identity" "current" {}
 
 locals {
   account_id = data.aws_caller_identity.current.account_id
-  nombre     = "pscnc-${var.tenant_id}-${var.environment}"
+  nombre     = "${var.resource_prefix}-${var.tenant_id}-${var.environment}"
 
   etiquetas = merge(var.tags, {
     Tenant      = var.tenant_id

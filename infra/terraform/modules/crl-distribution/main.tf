@@ -10,7 +10,7 @@
 ###############################################################################
 
 locals {
-  name = "pscnc-crl-${var.environment}"
+  name = "${var.resource_prefix}-crl-${var.environment}"
 }
 
 resource "aws_s3_bucket" "crl" {
@@ -280,7 +280,7 @@ resource "aws_cloudwatch_metric_alarm" "publisher_failed" {
 ###############################################################################
 
 resource "aws_sqs_queue" "crl_dlq" {
-  name = "pscnc-crl-publisher-dlq-${var.environment}"
+  name = "${var.resource_prefix}-crl-publisher-dlq-${var.environment}"
 
   # La clave de evidencia: el mensaje descartado lleva el contexto de la
   # invocación fallida.
@@ -295,7 +295,7 @@ resource "aws_sqs_queue" "crl_dlq" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "crl_dlq_no_vacia" {
-  alarm_name          = "pscnc-crl-dlq-${var.environment}"
+  alarm_name          = "${var.resource_prefix}-crl-dlq-${var.environment}"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
   metric_name         = "ApproximateNumberOfMessagesVisible"

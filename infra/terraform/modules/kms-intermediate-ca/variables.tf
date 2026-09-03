@@ -1,12 +1,32 @@
+variable "resource_prefix" {
+  description = <<-DESC
+    Prefijo de los nombres de recursos. Lo fija quien despliega, y por defecto NO
+    nombra a un prestador de servicios de confianza: el motor lo despliega el
+    cliente en su propia cuenta para firmar sus propias contrataciones (ADR-0011),
+    y un recurso llamado «pscnc-…» en su cuenta lo etiquetaría como prestador,
+    que es justamente lo que el encuadre niega.
+  DESC
+  type        = string
+  default     = "fenc"
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{1,20}$", var.resource_prefix))
+    error_message = "El prefijo debe ser minúsculas, dígitos y guiones, de 2 a 21 caracteres."
+  }
+}
+
 variable "environment" {
   description = "Entorno lógico del despliegue (dev, staging, prod)."
   type        = string
 }
 
 variable "key_alias" {
-  description = "Alias de la clave KMS, sin el prefijo 'alias/'."
+  description = <<-DESC
+    Alias de la clave KMS, sin el prefijo 'alias/'. Sin valor por defecto a
+    propósito: el alias identifica a la CA de quien despliega, y heredar el
+    nombre de otro produciría una CA que dice ser de alguien que no es.
+  DESC
   type        = string
-  default     = "pscnc-paraguay-intermediate-ca"
 }
 
 variable "key_spec" {
