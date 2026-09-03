@@ -387,7 +387,8 @@ correr_checkov() {
   disponible checkov || { log_warn "checkov no disponible: $(comando_instalacion checkov)"; return 0; }
   # checkov escribe results_json.json dentro del directorio indicado.
   local -a args=(-d . --output json --output-file-path "$INFORME_DIR/checkov" --quiet --soft-fail
-                 --skip-path node_modules --skip-path .venv --skip-path "$INFORMES_BASE")
+                 --skip-path node_modules --skip-path .venv --skip-path "$INFORMES_BASE"
+                 --skip-path .claude/worktrees)
   # Excepciones vigentes del manifiesto (IDs CKV_* separados por comas)
   [[ -n "$CHECKOV_SKIP" ]] && args+=(--skip-check "$CHECKOV_SKIP")
   checkov "${args[@]}" >"$INFORME_DIR/checkov.log" 2>&1 || true

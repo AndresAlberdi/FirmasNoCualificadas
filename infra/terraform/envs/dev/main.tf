@@ -49,13 +49,14 @@ locals {
   # signer-service). Se referencia por ARN construido y no por el output del
   # módulo para romper el ciclo kms ↔ signer-service: el servicio necesita el
   # ARN de la clave y la política de la clave necesita el ARN del rol.
-  signer_task_role_name = "pscnc-signer-${local.environment}-task-role"
+  signer_task_role_name = "${var.resource_prefix}-signer-${local.environment}-task-role"
   signer_task_role_arn  = "arn:aws:iam::${local.account_id}:role/${local.signer_task_role_name}"
 }
 
 # ------------------------------------------------------------ Observabilidad
 module "observability" {
-  source = "../../modules/observability"
+  source          = "../../modules/observability"
+  resource_prefix = var.resource_prefix
 
   environment               = local.environment
   account_id                = local.account_id
@@ -77,16 +78,17 @@ resource "aws_kms_key" "data" {
 }
 
 resource "aws_kms_alias" "data" {
-  name          = "alias/pscnc-data-${local.environment}"
+  name          = "alias/${var.resource_prefix}-data-${local.environment}"
   target_key_id = aws_kms_key.data.key_id
 }
 
 # ---------------------------------------------------------- CA intermedia ----
 module "intermediate_ca" {
-  source = "../../modules/kms-intermediate-ca"
+  source          = "../../modules/kms-intermediate-ca"
+  resource_prefix = var.resource_prefix
 
   environment      = local.environment
-  key_alias        = "pscnc-paraguay-intermediate-ca-${local.environment}"
+  key_alias        = "${var.resource_prefix}-paraguay-intermediate-ca-${local.environment}"
   key_spec         = var.ca_key_spec
   admin_role_arns  = var.secops_admin_role_arns
   signer_role_arns = [local.signer_task_role_arn]
@@ -123,7 +125,7 @@ module "evidence_vault" {
 
 # ------------------------------------------------- Balanceador interno -------
 resource "aws_security_group" "alb" {
-  name        = "pscnc-alb-${local.environment}"
+  name        = "${var.resource_prefix}-alb-${local.environment}"
   description = "Balanceador interno del servicio de firma"
   vpc_id      = var.vpc_id
 
@@ -147,7 +149,7 @@ resource "aws_security_group" "alb" {
 }
 
 resource "aws_lb" "internal" {
-  name                       = "pscnc-signer-${local.environment}"
+  name                       = "${var.resource_prefix}-signer-${local.environment}"
   internal                   = true
   load_balancer_type         = "application"
   security_groups            = [aws_security_group.alb.id]
@@ -158,7 +160,7 @@ resource "aws_lb" "internal" {
 }
 
 resource "aws_lb_target_group" "signer" {
-  name        = "pscnc-signer-${local.environment}"
+  name        = "${var.resource_prefix}-signer-${local.environment}"
   port        = 8080
   protocol    = "HTTP"
   target_type = "ip"
@@ -192,7 +194,8 @@ resource "aws_lb_listener" "https" {
 
 # ------------------------------------------------------- Servicio de firma ---
 module "signer_service" {
-  source = "../../modules/signer-service"
+  source          = "../../modules/signer-service"
+  resource_prefix = var.resource_prefix
 
   environment                     = local.environment
   region                          = var.region
@@ -221,7 +224,8 @@ module "signer_service" {
 
 # ------------------------------------------------------------ Perímetro ------
 module "api_edge" {
-  source = "../../modules/api-edge"
+  source          = "../../modules/api-edge"
+  resource_prefix = var.resource_prefix
 
   environment                 = local.environment
   private_subnet_ids          = var.private_subnet_ids
@@ -236,7 +240,8 @@ module "api_edge" {
 
 # ------------------------------------------------------ Distribución de CRL --
 module "crl_distribution" {
-  source = "../../modules/crl-distribution"
+  source          = "../../modules/crl-distribution"
+  resource_prefix = var.resource_prefix
 
   environment          = local.environment
   crl_bucket_name      = var.crl_bucket_name
@@ -273,8 +278,9 @@ module "retention_gate" {
 ###############################################################################
 
 module "tenant_keys" {
-  source   = "../../modules/kms-tenant-keys"
-  for_each = var.tenants
+  source          = "../../modules/kms-tenant-keys"
+  resource_prefix = var.resource_prefix
+  for_each        = var.tenants
 
   tenant_id   = each.key
   environment = local.environment

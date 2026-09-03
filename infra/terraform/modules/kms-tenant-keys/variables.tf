@@ -1,3 +1,20 @@
+variable "resource_prefix" {
+  description = <<-DESC
+    Prefijo de los nombres de recursos. Lo fija quien despliega, y por defecto NO
+    nombra a un prestador de servicios de confianza: el motor lo despliega el
+    cliente en su propia cuenta para firmar sus propias contrataciones (ADR-0011),
+    y un recurso llamado «pscnc-…» en su cuenta lo etiquetaría como prestador,
+    que es justamente lo que el encuadre niega.
+  DESC
+  type        = string
+  default     = "fenc"
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{1,20}$", var.resource_prefix))
+    error_message = "El prefijo debe ser minúsculas, dígitos y guiones, de 2 a 21 caracteres."
+  }
+}
+
 variable "tenant_id" {
   description = "Identificador del inquilino. Forma parte del alias y del contexto de cifrado."
   type        = string

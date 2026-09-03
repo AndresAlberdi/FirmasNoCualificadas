@@ -1,3 +1,13 @@
+variable "resource_prefix" {
+  description = <<-DESC
+    Prefijo de los nombres de recursos. Lo fija quien despliega. Por defecto NO
+    nombra a un prestador de servicios de confianza: el motor lo despliega el
+    cliente en su propia cuenta para firmar sus propias contrataciones (ADR-0011).
+  DESC
+  type        = string
+  default     = "fenc"
+}
+
 variable "region" {
   description = "Región de AWS del despliegue."
   type        = string

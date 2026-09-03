@@ -28,7 +28,7 @@ resource "aws_kms_key" "intermediate_ca" {
   policy                   = data.aws_iam_policy_document.key_policy.json
 
   tags = merge(var.tags, {
-    Name           = "pscnc-intermediate-ca-${var.environment}"
+    Name           = "${var.resource_prefix}-intermediate-ca-${var.environment}"
     DataClass      = "critical"
     Regulation     = "Ley-6822-2021"
     RotationPolicy = "manual-documented"
