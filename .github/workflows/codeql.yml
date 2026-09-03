@@ -18,7 +18,21 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # Sin filtro de rama base, a propósito. Con `branches: [main]`, un PR apilado
+    # sobre otra rama —la forma natural de partir un cambio grande en piezas
+    # revisables— no recibía ningún control, y solo empezaba a recibirlos al
+    # reapuntarlo a `main`, que es el peor momento para descubrir que algo falla.
+    #
+    # `edited` tampoco viene por defecto: los tipos implícitos son `opened`,
+    # `synchronize` y `reopened`. Sin él, cambiar la base de un PR —que emite
+    # `edited`— no dispara nada, y el PR queda sin checks. Falla del lado seguro,
+    # porque sin `compuerta-pr` no se puede fusionar, pero en silencio.
+    #
+    # El costo de las dos decisiones es más ejecuciones: PR contra cualquier rama,
+    # y una vuelta más al editar título o descripción. Se acepta. Que un cambio
+    # llegue a revisión sin que nadie note que no corrió nada es peor que gastar
+    # minutos de más.
+    types: [opened, synchronize, reopened, edited]
   schedule:
     # Semanal, lunes 03:17 UTC (minuto no redondo para evitar picos de cola)
     - cron: '17 3 * * 1'
