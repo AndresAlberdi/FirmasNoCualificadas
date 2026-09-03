@@ -5,14 +5,34 @@ export function formatearCedula(cedula: string): string {
   return cedula.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
 
+/** Dígitos que quedan a la vista, y cuántos deben permanecer ocultos como mínimo. */
+const DIGITOS_VISIBLES = 4
+const DIGITOS_OCULTOS_MINIMOS = 3
+
 /**
  * Enmascara la cédula para su visualización por defecto.
  * La revelación completa exige una acción explícita que queda auditada.
+ *
+ * El umbral se mide sobre los **dígitos**, no sobre la cadena ya formateada: los
+ * separadores de miles la alargan, de modo que una cédula corta superaba el
+ * control por los puntos que ella misma agregaba y terminaba mostrándose entera.
+ * Cuando no quedan suficientes dígitos por ocultar, se enmascara todo: revelar
+ * casi toda una cédula equivale a revelarla.
  */
 export function enmascararCedula(cedula: string): string {
+  const digitos = cedula.replace(/\D/g, '')
   const formateada = formatearCedula(cedula)
-  if (formateada.length <= 4) return '*'.repeat(formateada.length)
-  return formateada.slice(0, 5) + formateada.slice(5).replace(/\d/g, '*')
+
+  if (digitos.length < DIGITOS_VISIBLES + DIGITOS_OCULTOS_MINIMOS) {
+    return '*'.repeat(formateada.length)
+  }
+
+  let vistos = 0
+  return Array.from(formateada, (caracter) => {
+    if (!/\d/.test(caracter)) return caracter
+    vistos += 1
+    return vistos <= DIGITOS_VISIBLES ? caracter : '*'
+  }).join('')
 }
 
 /** Teléfono E.164 parcialmente oculto: +595981123456 → +595 981 ***456 */

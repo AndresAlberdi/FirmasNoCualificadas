@@ -63,6 +63,24 @@ export class TransportError extends Error {
   }
 }
 
+/**
+ * Recorta las barras finales de la URL base.
+ *
+ * Se hace con un recorrido y no con `replace(/\/+$/, "")`: un cuantificador
+ * anclado al final obliga al motor a reintentar desde cada posición de la
+ * cadena, de modo que una URL con muchas barras seguidas cuesta tiempo
+ * cuadrático. Acá la URL base la fija quien integra el SDK y no un tercero, así
+ * que el riesgo es remoto; el recorrido cuesta lo mismo de escribir y elimina
+ * la clase de problema en lugar de razonar sobre si es explotable.
+ */
+function sinBarrasFinales(url: string): string {
+  let fin = url.length;
+  while (fin > 0 && url[fin - 1] === "/") {
+    fin -= 1;
+  }
+  return url.slice(0, fin);
+}
+
 export class FncClient {
   private readonly baseUrl: string;
   private readonly tenantId: string;
@@ -72,7 +90,7 @@ export class FncClient {
 
   constructor(opciones: ClientOptions) {
     // Sin la barra final, `new URL(ruta, base)` descarta el último segmento.
-    this.baseUrl = opciones.baseUrl.replace(/\/+$/, "");
+    this.baseUrl = sinBarrasFinales(opciones.baseUrl);
     this.tenantId = opciones.tenantId;
     this.signer = opciones.signer;
     this.fetchImpl = opciones.fetch ?? globalThis.fetch;
