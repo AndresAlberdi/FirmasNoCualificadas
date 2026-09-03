@@ -29,6 +29,17 @@ name: CI/CD Multicloud (.devsecops.yml)
 on:
   pull_request:
     branches: [main]
+    # `edited` no viene por defecto —los tipos implícitos son `opened`,
+    # `synchronize` y `reopened`— y sin él un PR reapuntado a `main` no recibe
+    # ningún control: cambiar la base emite `edited`, y el filtro `branches` se
+    # evalúa sobre la base nueva, así que el evento correcto existe pero nadie lo
+    # escucha. El PR queda sin checks y `compuerta-pr` nunca aparece; falla del
+    # lado seguro, porque sin ese check no se puede fusionar, pero en silencio.
+    #
+    # El costo es que editar el título o la descripción vuelve a disparar el
+    # pipeline. Se acepta: gastar unos minutos de más es preferible a que un PR
+    # llegue a revisión sin que nadie note que no corrió nada.
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
     tags: ['v*']
