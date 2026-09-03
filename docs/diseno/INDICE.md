@@ -159,7 +159,12 @@ Contiene seis documentos: las resoluciones **1384/2022** y **262/2024**, el Anex
 firma—, y tres documentos de la ICPP dirigidos a los prestadores *cualificados*
 (`DOC-ICPP-01`, `-03`, `-07`) que no obligan a FNC pero describen qué espera el MIC.
 
-Su `LEEME.md` detalla qué acredita cada uno y a quién obliga. La lectura del `DOC-ICPP-20`
+Su `LEEME.md` detalla qué acredita cada uno y a quién obliga, y recoge la **corrección** que
+apareció al contrastar: `blueprint-firma-no-cualificada-paraguay-v2.md` §2 y
+`declaracion-practicas-perfiles-pscnc.md` §§27 y 32 atribuyen la impugnación de una firma
+electrónica al art. 308 del Código Procesal Civil, y el art. 40 de la ley remite al **art. 404
+del Código Civil**. Los documentos de análisis no se reescriben —son el material recibido—,
+pero la cita correcta es la del texto oficial. La lectura del `DOC-ICPP-20`
 confirmó la elección de RSA del ADR-0006 y abrió el inventario de apartamientos del
 certificado efímero que vive en `docs/CONFORMIDAD-PERFIL-CERTIFICADO.md`.
 

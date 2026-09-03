@@ -10,7 +10,7 @@ válido, y alguien lo va a presentar como si lo fuera.
 
 **Resuelto desde la última revisión:** T-11 (persistencia en DynamoDB del almacén de
 idempotencia y del repositorio de transacciones); T-06 (el panel pasó a `node` con suite
-propia); **N-01, N-05 y N-06**, cerrados por los textos oficiales incorporados a
+propia); **N-01, N-03, N-05 y N-06**, cerrados por los textos oficiales incorporados a
 `docs/diseno/normativa/`. El `DOC-ICPP-20 v2.0` confirma que RSA es obligatorio —ECDSA
 habría incumplido— y que el perfil alcanza al certificado del firmante, no solo al del
 prestador. Lo que abre es un inventario de apartamientos concretos:
@@ -44,7 +44,7 @@ mano.
 | # | Qué hay que verificar | Qué decisión sostiene | Riesgo si es falsa |
 | :-- | :---- | :---- | :---- |
 | N-02 | **Texto de la Res. SS.SG. N.º 210/2025**, arts. 4 y 9 | Norma citada en la constancia del perfil `PY` | La constancia citaría mal la norma que la habilita |
-| N-03 | **Ley N.º 6822/2021 y Decreto N.º 7576/2022** | Todo el marco de PSCNC | — *(parcialmente respaldado: los considerandos de la Res. 262/2024 acreditan el art. 96 —el MIC como Autoridad de Aplicación a través de la Dirección General de Comercio Electrónico— y el plazo de tres meses para comunicar el inicio de actividad. El texto de la ley sigue sin estar en el repositorio)* |
+| N-07 | **Artículo 404 del Código Civil Paraguayo** | Qué hay que probar cuando se impugna la autenticidad de una firma electrónica: es la remisión del art. 40 de la ley | Es el requisito central de la firma no cualificada y no está contrastado. Sustituye a la cita del art. 308 del Código Procesal Civil, que los documentos de análisis daban por buena y **es incorrecta** |
 | N-04 | Número **PEN** de la organización para el OID de política de certificado | Extensión `certificatePolicies` | Hoy el OID es un marcador de posición |
 
 **Acción concreta:** los textos oficiales tienen que entrar al repositorio antes de que se

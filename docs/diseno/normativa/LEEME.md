@@ -10,12 +10,47 @@ discrepan, manda el texto — y cuando el texto no está, la afirmación va a la
 
 | Archivo | Norma | Qué es | ¿Obliga a FNC? |
 | :---- | :---- | :---- | :---- |
+| `ley-6822-2021.pdf` | Ley N.º 6822, 30/12/2021 | **La ley marco.** Define el servicio de confianza (art. 4.º num. 48), el efecto jurídico de la firma (art. 39) y su impugnación (art. 40), la comunicación de actividad de los prestadores no cualificados (art. 15), el soporte del documento electrónico (art. 63) y la Autoridad de Aplicación (art. 96) | **Sí** |
+| `decreto-7576-2022.pdf` | Decreto N.º 7576/2022 | Reglamento. Art. 5.º: procedimiento de comunicación de inicio y listado público de prestadores no cualificados. Art. 6.º: incidentes de seguridad **dentro de las 24 horas** | **Sí** |
 | `res-mic-1384-2022.pdf` | Res. MIC N.º 1384, 6/10/2022 | Reglamenta la comunicación de inicio de actividad de servicios **no cualificados**. Aprueba el formulario `FOR-ICPP-02` (Anexo I) y el perfil de certificado del PSCNC (Anexo II) | **Sí** |
 | `res-mic-262-2024.pdf` | Res. MIC N.º 262, 4/4/2024 | Modifica el art. 3.º de la 1384/2022 y aprueba `DOC-ICPP-20 v2.0` | **Sí** |
 | `doc-icpp-20-v2.0.pdf` | Anexo I de la Res. 262/2024 | **El perfil de certificado.** Campos, obligatoriedad y algoritmos, para la AC Raíz, para el PSCNC y para las entidades finales | **Sí — es la norma que rige el motor de firma** |
 | `doc-icpp-01-v2.0.pdf` | Anexo I de la Res. N.º 0495/2026 | Política y DPC de la **Autoridad Certificadora Raíz** de la ICPP | Indirectamente |
 | `doc-icpp-03-v1.0.pdf` | Anexo de la Res. N.º 811/2022 | Directivas obligatorias para redactar la DPC de los prestadores **cualificados** | **No** — pero es la plantilla |
 | `doc-icpp-07-v1.0.pdf` | Anexo de la Res. N.º 812/2022 | Directivas para la DPC del prestador **cualificado** que genera o gestiona datos de creación de firma (firma remota con clave en HSM bajo su custodia) | **No** — pero describe nuestra arquitectura en su versión cualificada |
+
+## La definición que ordena el encuadre — verificada
+
+> Servicio de confianza: el servicio electrónico **prestado habitualmente a cambio de una
+> remuneración**, consistente en: a) la creación, verificación y validación de firmas
+> electrónicas, sellos electrónicos, sellos de tiempo electrónicos, servicios de entrega
+> electrónica certificada y certificados relativos a estos servicios […]
+>
+> — Ley N.º 6822/2021, **artículo 4.º, numeral 48**
+
+Es la cita que sostiene todo el encuadre del proyecto, y ahora sale del texto y no de un
+resumen. Quien firma sus propias contrataciones no presta un servicio de confianza; el
+**artículo 15**, que impone comunicar la actividad dentro de los tres meses, está dirigido a
+los *prestadores*.
+
+## Lo que la ley dice sobre el valor probatorio
+
+* **Art. 39.1** — no se niegan efectos jurídicos ni admisibilidad a una firma electrónica por
+  el mero hecho de serlo o de no cumplir los requisitos de la cualificada.
+* **Art. 39.2** — la equivalencia con la firma manuscrita se reconoce **solo a la
+  cualificada**. No se extiende a las demás.
+* **Art. 40** — impugnada la autenticidad, se estará a lo establecido en el **artículo 404 del
+  Código Civil Paraguayo**.
+* **Art. 63.1.b** — los instrumentos privados suscritos con firma **cualificada** acreditan la
+  autenticidad de la firma y la identidad del titular; aun así **no hacen fe respecto de su
+  fecha** salvo sello de tiempo de un prestador cualificado.
+* **Art. 63.2** — el soporte con datos firmados electrónicamente es admisible como prueba
+  documental en procedimientos judiciales y administrativos.
+
+**Una corrección que apareció al contrastar.** Los documentos de análisis atribuían la
+impugnación de una firma electrónica al art. 308 del Código Procesal Civil. El art. 40 remite
+al **art. 404 del Código Civil**. No es el mismo cuerpo legal ni el mismo artículo, y ese
+artículo todavía no está en el repositorio (N-07).
 
 ## La distinción que ordena esta carpeta: cualificado ≠ no cualificado
 
