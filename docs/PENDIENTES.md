@@ -9,7 +9,12 @@ válido, y alguien lo va a presentar como si lo fuera.
 Última revisión: 2026-09-02.
 
 **Resuelto desde la última revisión:** T-11 (persistencia en DynamoDB del almacén de
-idempotencia y del repositorio de transacciones).
+idempotencia y del repositorio de transacciones); T-06 (el panel pasó a `node` con suite
+propia); **N-01, N-03, N-05 y N-06**, cerrados por los textos oficiales incorporados a
+`docs/diseno/normativa/`. El `DOC-ICPP-20 v2.0` confirma que RSA es obligatorio —ECDSA
+habría incumplido— y que el perfil alcanza al certificado del firmante, no solo al del
+prestador. Lo que abre es un inventario de apartamientos concretos:
+`docs/CONFORMIDAD-PERFIL-CERTIFICADO.md`.
 
 ---
 
@@ -23,7 +28,7 @@ y probado.
 | :-- | :---- | :---- | :---- |
 | B-01 | **Contratar la TSA cualificada** con un PCSC habilitado en Paraguay (Confirma, VIT, CODE 100, Documenta, SOS Tecnología). Sin fecha cierta de un tercero, una firma con certificado efímero es inverificable a futuro (ADR-0004) | Negocio | Abierto |
 | B-02 | **Emitir el certificado real de la CA intermedia** sobre la clave que ya vive en KMS. Hoy `dev` usa una raíz autofirmada generada por Terraform | SecOps + PKI | Abierto |
-| B-03 | **Comunicar el inicio de actividades a la DGFDCE del MIC** y aparecer en el listado público de PSCNC. Plazo legal: 3 meses desde el inicio efectivo de la prestación. Requiere REPSE previo | Legal + Negocio | Abierto |
+| B-03 | **Presentar el formulario `FOR-ICPP-02`** ante la DGFDCE del MIC y aparecer en el listado público de PSCNC. El formulario lo aprueba el art. 2.º de la Res. 1384/2022 (Anexo I). Plazo legal: 3 meses desde el inicio efectivo de la prestación. Requiere REPSE previo | Legal + Negocio | Abierto |
 
 Mientras tanto, `dev` opera con CA autofirmada y TSA de prueba **etiquetadas en cada
 certificado y en cada acta** (`environment=dev`, `tsa=test`).
@@ -38,11 +43,8 @@ mano.
 
 | # | Qué hay que verificar | Qué decisión sostiene | Riesgo si es falsa |
 | :-- | :---- | :---- | :---- |
-| N-01 | **Anexo `DOC-ICPP-20 v2.0`** de la Res. MIC N.º 262/2024: qué campos y qué algoritmos fija el perfil. La resolución ya está en `docs/diseno/normativa/`, pero es el acto que aprueba el perfil y **no lo contiene** | ADR-0006, elección de `RSA_4096` | Si admite ECDSA, se pierde una optimización. Si **exige** algo distinto de RSA-4096, el perfil emitido no cumple la norma |
-| N-05 | **¿`DOC-ICPP-20` rige el certificado del prestador o el que el prestador emite al firmante?** El título de la Res. 262/2024 y su art. 1.º dicen «del prestador»; el repositorio venía asumiendo que alcanza también al certificado efímero del firmante | ADR-0006 y la §4 de la DPSC, que especifica el perfil del certificado efímero «conforme a la Res. 262/2024» | Si solo rige el certificado del prestador, la §4 de la DPSC invoca una norma que no le aplica y el perfil del efímero queda sin respaldo declarado. Lo dirime el Anexo (N-01) |
-| N-06 | **Res. MIC N.º 1384/2022 y su Anexo II**, que la 262/2024 modifica parcialmente en su art. 3.º | El encuadre completo del perfil: qué quedó modificado y qué sigue vigente | Se cita la norma modificadora sin conocer la modificada |
 | N-02 | **Texto de la Res. SS.SG. N.º 210/2025**, arts. 4 y 9 | Norma citada en la constancia del perfil `PY` | La constancia citaría mal la norma que la habilita |
-| N-03 | **Ley N.º 6822/2021 y Decreto N.º 7576/2022** | Todo el marco de PSCNC | — *(parcialmente respaldado: los considerandos de la Res. 262/2024 acreditan el art. 96 —el MIC como Autoridad de Aplicación a través de la Dirección General de Comercio Electrónico— y el plazo de tres meses para comunicar el inicio de actividad. El texto de la ley sigue sin estar en el repositorio)* |
+| N-07 | **Artículo 404 del Código Civil Paraguayo** | Qué hay que probar cuando se impugna la autenticidad de una firma electrónica: es la remisión del art. 40 de la ley | Es el requisito central de la firma no cualificada y no está contrastado. Sustituye a la cita del art. 308 del Código Procesal Civil, que los documentos de análisis daban por buena y **es incorrecta** |
 | N-04 | Número **PEN** de la organización para el OID de política de certificado | Extensión `certificatePolicies` | Hoy el OID es un marcador de posición |
 
 **Acción concreta:** los textos oficiales tienen que entrar al repositorio antes de que se
@@ -63,11 +65,35 @@ abierto, porque lo que hace falta es su Anexo.
 | L-02 | **Datos de identificación del prestador en la DPSC** | El documento tiene campos entre corchetes: razón social, registro público, REPSE, representante legal, dominio, contacto del CISO |
 | L-03 | **Coherencia entre la DPSC y el algoritmo implementado** | La DPSC declara RSA-4096. Si N-01 cambia la decisión del ADR-0006, **la DPSC debe corregirse antes de presentarse** |
 | L-04 | **Póliza de responsabilidad civil voluntaria** | No exigible a un PSCNC, pero recomendada por el tratamiento de biometría de terceros. Decisión de negocio |
-| L-05 | **Consulta escrita al MIC** sobre el alcance del registro | Cierra el único punto opinable del encuadre |
+| L-05 | **Consulta escrita al MIC** sobre el alcance del registro y sobre el perfil | Cierra el punto opinable del encuadre, y suma tres preguntas que el `DOC-ICPP-20` no responde: (a) si el `extendedKeyUsage` admite OID adicionales a los dos enumerados; (b) si el perfil admite apartamientos en entornos no productivos, donde el certificado debe poder distinguirse a simple vista; (c) **quién emite el certificado de la CA intermedia de un prestador no cualificado** — el `DOC-ICPP-01 v2.0` declara que la política de la ACR-Py alcanza a los certificados emitidos a prestadores *cualificados*, y no dice si emite a los no cualificados. De la respuesta depende que nuestra raíz ancle en el Estado o sea privada |
 
 ---
 
-## 4. Alcance técnico diferido
+## 4. Conformidad del certificado efímero con el `DOC-ICPP-20 v2.0`
+
+Apartamientos concretos entre el perfil que la norma fija para el *certificado no
+cualificado de firma electrónica* (§4.1) y lo que hoy emite `crypto/ephemeral_ca.py`. No
+son alcance diferido: son **incumplimientos de campos marcados obligatorios**, detectados
+al leer el texto oficial. El análisis campo por campo, con lo que la norma además
+*confirma*, está en `docs/CONFORMIDAD-PERFIL-CERTIFICADO.md`.
+
+Ninguno afecta al **nivel 1**, que no emite certificados. Todos bloquean el nivel 2 en
+producción, que ya estaba bloqueado por B-01 y B-02.
+
+| # | Apartamiento | Detalle |
+| :-- | :---- | :---- |
+| P-01 | **El `serialNumber` del sujeto usa el prefijo del país y no la sigla del documento** | La norma exige `CI` o `PAS` seguido del número; hoy sale `PY-{cédula}`. Se corrige en `jurisdictions/py/`, no en el motor |
+| P-02 | **Faltan `organizationName` y el valor fijo de `organizationalUnitName` en el sujeto** | La norma fija `O= CERTIFICADO NO CUALIFICADO DE FIRMA ELECTRÓNICA` y `OU=FIRMA ELECTRÓNICA`. El `O` no se emite y el `OU` lleva un valor propio |
+| P-03 | **La marca `[NO VALIDO - ENTORNO DEV]` y el identificador de transacción viven en la OU, que ahora tiene valor fijo** | Hay que decidir dónde se reubican sin perder la propiedad de que un artefacto de `dev` se distinga a simple vista en cualquier visor |
+| P-04 | **Faltan `surname` y `givenName`, obligatorios y separados del `commonName`** | **Cambia el contrato v1:** hoy llega `signer_common_name` como una sola cadena, y partirla por el espacio sería adivinar. Necesita ADR y versión del SDK |
+| P-05 | **Extensiones obligatorias incompletas** | Falta `keyEncipherment` en `keyUsage`, falta `clientAuth` en `extendedKeyUsage` (y sobra el OID de *Document Signing* de Microsoft), falta `authorityInfoAccess` entero, y `certificatePolicies` no lleva `CPS Pointer` ni `User Notice`. CRL y AIA deberían impedir el arranque en producción si no están configurados |
+
+El orden de ataque sugerido y las tres preguntas que el texto no cierra están al final de
+`docs/CONFORMIDAD-PERFIL-CERTIFICADO.md`; las preguntas viajan con L-05.
+
+---
+
+## 5. Alcance técnico diferido
 
 | # | Pendiente | Por qué se difiere |
 | :-- | :---- | :---- |
@@ -113,7 +139,7 @@ del código, no en una comprobación automática.
 
 ---
 
-## 5. Configuración remota de GitHub (la ejecuta el propietario)
+## 6. Configuración remota de GitHub (la ejecuta el propietario)
 
 El bootstrap del estándar se ejecutó con `--sin-gh`: crear variables y secretos, y
 aplicar rulesets, son cambios en la cuenta de GitHub y no los hace un agente.
@@ -155,7 +181,7 @@ depurar el pipeline con `main` ya protegido.
 
 ---
 
-## 6. Decisiones de negocio abiertas
+## 7. Decisiones de negocio abiertas
 
 | # | Pregunta | Quién decide |
 | :-- | :---- | :---- |

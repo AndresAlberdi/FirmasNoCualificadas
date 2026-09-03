@@ -79,3 +79,6 @@ secrets.tfvars
 .trivy-cache/
 .trivyignore.yaml
 .gitleaksignore
+
+# Worktrees de trabajo: son checkouts del propio repositorio, no contenido suyo.
+.claude/worktrees/
