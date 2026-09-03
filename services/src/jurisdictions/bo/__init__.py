@@ -78,15 +78,23 @@ PERFIL = JurisdictionProfile(
             # Es la diferencia que hace útil este perfil como prueba: una validación
             # que siguiera asumiendo el formato paraguayo lo rechazaría.
             pattern=r"[0-9]{5,10}(?:[- ][A-Z0-9]{1,3})?",
+            certificate_prefix="CI",
         ),
         DocumentType(
             code="PASAPORTE",
             label="pasaporte",
             pattern=r"[A-Z0-9]{6,15}",
+            certificate_prefix="PAS",
         ),
     ),
-    certificate_serial_prefix="BO",
+    signer_index_prefix="BO",
     certificate_country="BO",
+    # Sin verificar, como el resto de los campos normativos de este perfil: no hay
+    # constancia de que Bolivia fije estos literales, ni de cuáles serían. Se
+    # declaran para que la estructura funcione, y por eso el perfil no opera fuera
+    # de desarrollo.
+    certificate_subject_organization=_SIN_VERIFICAR + "organizacion del sujeto",
+    certificate_subject_organizational_unit=_SIN_VERIFICAR + "unidad organizativa",
     retention=EvidenceRetention(
         # Se toma el mismo mínimo operativo que en Paraguay por prudencia: conservar
         # de más no invalida evidencia, conservar de menos sí. El plazo real depende

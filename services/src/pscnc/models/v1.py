@@ -204,6 +204,15 @@ class ConfirmTransactionRequest(_Base):
     #: Número de documento para el `serialNumber`, con el formato que exige la
     #: jurisdicción.
     signer_national_id: str | None = Field(default=None, max_length=30)
+    #: Tipo de documento presentado (`CI_PY`, `PASAPORTE`…), tal como lo declara el
+    #: catálogo de la jurisdicción. Determina la **sigla** del `serialNumber` del
+    #: certificado, que es lo que distingue una cédula de un pasaporte ante un
+    #: validador. Es opcional por compatibilidad: si no viene se asume el documento
+    #: principal de la jurisdicción, pero declararlo evita que el certificado
+    #: afirme un tipo de documento que el titular no presentó.
+    signer_document_type: str | None = Field(
+        default=None, max_length=21, pattern=r"^[A-Z][A-Z0-9_]{1,20}$"
+    )
 
     @model_validator(mode="after")
     def _una_sola_via_de_otp(self) -> ConfirmTransactionRequest:

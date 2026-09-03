@@ -169,7 +169,11 @@ def test_certificado_del_firmante_embebido_es_el_emitido(firmante, sujeto) -> No
     firma = lector.embedded_signatures[0]
 
     sujeto_embebido = firma.signer_cert.subject.native
-    assert sujeto_embebido["serial_number"] == "PY-4829153"
+    # El sujeto que viaja dentro del PDF es el del perfil nacional, no uno propio.
+    assert sujeto_embebido["serial_number"] == "CI4829153"
+    assert sujeto_embebido["organization_name"] == (
+        "CERTIFICADO NO CUALIFICADO DE FIRMA ELECTRÓNICA"
+    )
     assert format(firma.signer_cert.serial_number, "x") == resultado.certificate.serial_number
 
 

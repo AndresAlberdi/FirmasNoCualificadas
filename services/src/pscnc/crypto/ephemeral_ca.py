@@ -51,7 +51,12 @@ class SubjectData:
     common_name: str
     national_id: str
     country: str
+    #: Sigla del tipo de documento presentado (``CI``, ``PAS``…), no el país.
     serial_prefix: str
+    #: Valor literal del atributo ``O``, fijado por el perfil de certificado.
+    organization: str
+    #: Valor literal del atributo ``OU``, fijado por el perfil de certificado.
+    organizational_unit: str
     transaction_id: str = ""
     email: str | None = None
 
@@ -62,22 +67,33 @@ class SubjectData:
         *,
         common_name: str,
         national_id: str,
+        document_type: str | None = None,
         transaction_id: str = "",
         email: str | None = None,
     ) -> SubjectData:
-        """Construye el sujeto tomando país y prefijo del perfil."""
+        """Construye el sujeto con los valores que fija el perfil de la jurisdicción.
+
+        ``document_type`` determina la sigla del ``serialNumber``. Si el inquilino
+        no lo declara se asume el documento principal de la jurisdicción, y la
+        suposición queda registrada acá y no escondida: un certificado que dijera
+        «cédula» sobre el número de un pasaporte afirmaría un documento que el
+        titular no presentó.
+        """
+        tipo = document_type or profile.default_document_type.code
         return cls(
             common_name=common_name,
             national_id=national_id,
             country=profile.certificate_country,
-            serial_prefix=profile.certificate_serial_prefix,
+            serial_prefix=profile.document_type(tipo).certificate_prefix,
+            organization=profile.certificate_subject_organization,
+            organizational_unit=profile.certificate_subject_organizational_unit,
             transaction_id=transaction_id,
             email=email,
         )
 
     @property
     def serial_number(self) -> str:
-        return f"{self.serial_prefix}-{self.national_id}"
+        return f"{self.serial_prefix}{self.national_id}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,22 +214,34 @@ class EphemeralCertificateAuthority:
 
     # -------------------------------------------------------------- Interno --
     def _organizational_unit(self, subject: SubjectData) -> str:
-        """Unidad organizativa del sujeto, con la marca de entorno si corresponde.
+        """Unidad organizativa del sujeto.
 
-        Fuera de producción el certificado se rotula en un campo que **cualquier
-        visor muestra sin desplegar extensiones**, incluido Adobe Reader. Es
-        deliberado: un artefacto de desarrollo firmado con una CA autofirmada y
-        una TSA de prueba no puede poder confundirse con uno real, y una marca
+        **En producción vale exactamente lo que fija el perfil de certificado de la
+        jurisdicción**, sin agregados: el campo no admite texto libre.
+
+        Fuera de producción se antepone la marca de entorno. El campo se eligió
+        porque **cualquier visor lo muestra sin desplegar extensiones**, incluido
+        Adobe Reader: un artefacto de desarrollo, firmado con una CA autofirmada y
+        una TSA de prueba, no puede poder confundirse con uno real, y una marca
         escondida en una extensión no lo impide — nadie la mira.
+
+        Apartarse ahí del perfil no es un incumplimiento: en desarrollo no somos un
+        prestador comunicado ante el organismo y el certificado no pretende ser
+        oponible, de modo que la desviación **es** la señal de que el artefacto no
+        sirve como prueba. Lo que no puede pasar es que ambos entornos emitan el
+        mismo sujeto.
+
+        El identificador de transacción viajaba acá y ya no cabe en producción. El
+        vínculo entre certificado y transacción no se pierde: el acta sellada
+        registra el número de serie del certificado. Dónde se reubica el
+        identificador es una decisión abierta (P-03 en `docs/PENDIENTES.md`).
         """
-        base = (
-            f"Firma Electronica No Cualificada - TX {subject.transaction_id}"
-            if subject.transaction_id
-            else "Firma Electronica No Cualificada"
-        )
         if self.is_production:
-            return base
-        return f"[NO VALIDO - ENTORNO {self._environment.upper()}] {base}"
+            return subject.organizational_unit
+        marca = f"[NO VALIDO - ENTORNO {self._environment.upper()}]"
+        if subject.transaction_id:
+            return f"{marca} {subject.organizational_unit} - TX {subject.transaction_id}"
+        return f"{marca} {subject.organizational_unit}"
 
     def _signature_algorithm(self) -> algos.SignedDigestAlgorithm:
         nombre = ALGORITMOS_SOPORTADOS[self._ca_signer.signing_algorithm]
@@ -251,6 +279,7 @@ class EphemeralCertificateAuthority:
         nombre_sujeto = x509.Name.build(
             {
                 "country_name": subject.country,
+                "organization_name": subject.organization,
                 "common_name": subject.common_name,
                 "serial_number": subject.serial_number,
                 "organizational_unit_name": self._organizational_unit(subject),

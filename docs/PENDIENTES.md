@@ -71,8 +71,9 @@ abierto, porque lo que hace falta es su Anexo.
 
 ## 4. Conformidad del certificado efímero con el `DOC-ICPP-20 v2.0`
 
-Apartamientos concretos entre el perfil que la norma fija para el *certificado no
-cualificado de firma electrónica* (§4.1) y lo que hoy emite `crypto/ephemeral_ca.py`. No
+Apartamientos entre el perfil que la norma fija para el *certificado no cualificado de
+firma electrónica* (§4.1) y lo que emite `crypto/ephemeral_ca.py`. **P-01 y P-02 están
+corregidos**; queda lo de abajo. No
 son alcance diferido: son **incumplimientos de campos marcados obligatorios**, detectados
 al leer el texto oficial. El análisis campo por campo, con lo que la norma además
 *confirma*, está en `docs/CONFORMIDAD-PERFIL-CERTIFICADO.md`.
@@ -82,9 +83,7 @@ producción, que ya estaba bloqueado por B-01 y B-02.
 
 | # | Apartamiento | Detalle |
 | :-- | :---- | :---- |
-| P-01 | **El `serialNumber` del sujeto usa el prefijo del país y no la sigla del documento** | La norma exige `CI` o `PAS` seguido del número; hoy sale `PY-{cédula}`. Se corrige en `jurisdictions/py/`, no en el motor |
-| P-02 | **Faltan `organizationName` y el valor fijo de `organizationalUnitName` en el sujeto** | La norma fija `O= CERTIFICADO NO CUALIFICADO DE FIRMA ELECTRÓNICA` y `OU=FIRMA ELECTRÓNICA`. El `O` no se emite y el `OU` lleva un valor propio |
-| P-03 | **La marca `[NO VALIDO - ENTORNO DEV]` y el identificador de transacción viven en la OU, que ahora tiene valor fijo** | Hay que decidir dónde se reubican sin perder la propiedad de que un artefacto de `dev` se distinga a simple vista en cualquier visor |
+| P-03 | **Falta decidir dónde viaja el identificador de transacción en producción** | Resuelto a medias: la OU ya vale el literal del perfil en producción y conserva la marca `[NO VALIDO - ENTORNO {ENV}]` fuera de ella, de modo que los dos entornos nunca emiten el mismo sujeto. Lo que queda es el identificador de transacción, que en producción ya no cabe en la OU. **No se perdió el vínculo**: el acta sellada registra el número de serie del certificado. Falta decidir si se reubica —extensión propia, `User Notice` de `certificatePolicies`— o si alcanza con el serial |
 | P-04 | **Faltan `surname` y `givenName`, obligatorios y separados del `commonName`** | **Cambia el contrato v1:** hoy llega `signer_common_name` como una sola cadena, y partirla por el espacio sería adivinar. Necesita ADR y versión del SDK |
 | P-05 | **Extensiones obligatorias incompletas** | Falta `keyEncipherment` en `keyUsage`, falta `clientAuth` en `extendedKeyUsage` (y sobra el OID de *Document Signing* de Microsoft), falta `authorityInfoAccess` entero, y `certificatePolicies` no lleva `CPS Pointer` ni `User Notice`. CRL y AIA deberían impedir el arranque en producción si no están configurados |
 
