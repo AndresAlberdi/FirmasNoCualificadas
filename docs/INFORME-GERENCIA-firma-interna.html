@@ -1,0 +1,635 @@
+<title>Vía a la firma interna</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;0,7..72,700;1,7..72,400&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ground:   #F2F4F2;
+    --surface:  #FFFFFF;
+    --sunk:     #E7EBE8;
+    --ink:      #16211D;
+    --muted:    #52625B;
+    --faint:    #7B8A83;
+    --rule:     #D5DDD8;
+    --rule-firm:#B4C0BA;
+
+    --sello:      #2F6D5A;
+    --sello-soft: #E1EFE9;
+    --bloqueo:      #9C3024;
+    --bloqueo-soft: #F6E4E1;
+    --disponible:      #2F6D5A;
+    --disponible-soft: #E1EFE9;
+    --duda:      #8A5D12;
+    --duda-soft: #F7EFDE;
+
+    --shadow: 0 1px 2px rgba(22,33,29,.05), 0 10px 28px -14px rgba(22,33,29,.16);
+
+    --serif: "Literata", Georgia, "Times New Roman", serif;
+    --sans: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #0D1210;
+      --surface:  #141C19;
+      --sunk:     #1A2421;
+      --ink:      #E1E8E4;
+      --muted:    #94A39C;
+      --faint:    #74837C;
+      --rule:     #253029;
+      --rule-firm:#35443C;
+
+      --sello:      #64B698;
+      --sello-soft: #122C24;
+      --bloqueo:      #E27B6B;
+      --bloqueo-soft: #2F1A16;
+      --disponible:      #64B698;
+      --disponible-soft: #122C24;
+      --duda:      #D2A458;
+      --duda-soft: #2C2413;
+
+      --shadow: 0 1px 2px rgba(0,0,0,.45), 0 10px 28px -14px rgba(0,0,0,.65);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:   #0D1210;
+    --surface:  #141C19;
+    --sunk:     #1A2421;
+    --ink:      #E1E8E4;
+    --muted:    #94A39C;
+    --faint:    #74837C;
+    --rule:     #253029;
+    --rule-firm:#35443C;
+
+    --sello:      #64B698;
+    --sello-soft: #122C24;
+    --bloqueo:      #E27B6B;
+    --bloqueo-soft: #2F1A16;
+    --disponible:      #64B698;
+    --disponible-soft: #122C24;
+    --duda:      #D2A458;
+    --duda-soft: #2C2413;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.45), 0 10px 28px -14px rgba(0,0,0,.65);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.68;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .hoja { max-width: 1000px; margin: 0 auto; padding: 0 clamp(18px, 4vw, 48px) 100px; }
+  p { max-width: 66ch; }
+  a { color: var(--sello); }
+  :focus-visible { outline: 2px solid var(--sello); outline-offset: 3px; }
+
+  /* ------------------------------------------------------------ Portada -- */
+  .portada { padding: clamp(46px, 8vw, 90px) 0 34px; border-bottom: 3px double var(--rule-firm); }
+
+  .membrete {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--faint);
+    display: flex; flex-wrap: wrap; gap: 6px 16px;
+    margin-bottom: 22px;
+  }
+  .membrete span:not(:last-child)::after { content: " ·"; color: var(--rule-firm); }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: clamp(2rem, 5.4vw, 3.2rem);
+    line-height: 1.1;
+    letter-spacing: -.02em;
+    text-wrap: balance;
+    margin: 0 0 20px;
+    max-width: 20ch;
+  }
+
+  .sumario {
+    font-size: clamp(1.06rem, 2vw, 1.24rem);
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 60ch;
+    margin: 0;
+  }
+
+  /* ------------------------------------------------------------ Titular -- */
+  .titular {
+    margin: 32px 0 0;
+    padding: 24px 26px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 5px solid var(--sello);
+    border-radius: 3px;
+    box-shadow: var(--shadow);
+  }
+  .titular h2 { margin: 0 0 10px; font-size: 1.16rem; line-height: 1.35; }
+  .titular p { margin: 0 0 12px; font-size: .99rem; }
+  .titular p:last-child { margin-bottom: 0; }
+
+  /* --------------------------------------------------------- Secciones --- */
+  section { padding-top: clamp(48px, 7vw, 76px); }
+
+  .rotulo {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0 0 10px;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(1.42rem, 3.1vw, 1.86rem);
+    line-height: 1.24;
+    letter-spacing: -.014em;
+    text-wrap: balance;
+    margin: 0 0 16px;
+    max-width: 26ch;
+  }
+
+  h3 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 1.02rem;
+    line-height: 1.35;
+    margin: 0 0 8px;
+  }
+
+  .entrada { color: var(--muted); margin-bottom: 26px; }
+
+  code, .ref {
+    font-family: var(--mono);
+    font-size: .855em;
+    background: var(--sunk);
+    padding: .1em .38em;
+    border-radius: 2px;
+  }
+
+  /* ------------------------------------------------------------ Tablas --- */
+  .marco { overflow-x: auto; border: 1px solid var(--rule); border-radius: 3px; background: var(--surface); box-shadow: var(--shadow); margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; font-family: var(--sans); font-size: .92rem; min-width: 580px; }
+  th, td { text-align: left; padding: 14px 18px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th {
+    font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--faint); background: var(--sunk); border-bottom: 1px solid var(--rule-firm); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td strong { font-weight: 600; }
+
+  .chip {
+    display: inline-block; font-family: var(--sans); font-size: 10px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase; padding: 4px 9px; border-radius: 2px; white-space: nowrap;
+  }
+  .chip.si  { color: var(--disponible); background: var(--disponible-soft); }
+  .chip.no  { color: var(--bloqueo);    background: var(--bloqueo-soft); }
+  .chip.ojo { color: var(--duda);       background: var(--duda-soft); }
+
+  /* ------------------------------------------------------------ Citas ---- */
+  blockquote {
+    margin: 0 0 18px;
+    padding: 4px 0 4px 20px;
+    border-left: 3px solid var(--sello);
+    font-style: italic;
+    font-size: 1.04rem;
+    line-height: 1.55;
+    max-width: 58ch;
+  }
+  blockquote cite {
+    display: block; margin-top: 9px; font-family: var(--sans); font-style: normal;
+    font-size: 10.5px; font-weight: 600; letter-spacing: .11em; text-transform: uppercase; color: var(--faint);
+  }
+
+  /* --------------------------------------------- Estado de verificación -- */
+  .fuentes { display: flex; flex-direction: column; gap: 12px; }
+  .fuente {
+    display: grid; grid-template-columns: auto 1fr; gap: 0 18px; align-items: start;
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 3px;
+    padding: 16px 20px; box-shadow: var(--shadow);
+  }
+  .fuente.sin { border-left: 4px solid var(--duda); }
+  .fuente.con { border-left: 4px solid var(--sello); }
+  .fuente h3 { margin-bottom: 5px; }
+  .fuente p { margin: 0; font-family: var(--sans); font-size: .89rem; color: var(--muted); max-width: none; }
+
+  /* ---------------------------------------------------------- Decisión --- */
+  .decisiones { list-style: none; margin: 0; padding: 0; counter-reset: d; display: flex; flex-direction: column; }
+  .decisiones li {
+    display: grid; grid-template-columns: auto 1fr; gap: 0 20px;
+    padding: 18px 4px; border-bottom: 1px solid var(--rule); align-items: baseline;
+  }
+  .decisiones li:last-child { border-bottom: 0; }
+  .decisiones li::before {
+    counter-increment: d; content: counter(d);
+    font-family: var(--mono); font-size: .82rem; font-weight: 600;
+    color: var(--surface); background: var(--ink);
+    width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%;
+    font-variant-numeric: tabular-nums;
+  }
+  .decisiones h3 { margin-bottom: 5px; }
+  .decisiones p { margin: 0; font-size: .96rem; color: var(--muted); }
+
+  /* ------------------------------------------------------------ Cierre --- */
+  .cierre {
+    margin-top: clamp(52px, 8vw, 84px); padding-top: 28px;
+    border-top: 3px double var(--rule-firm);
+    font-family: var(--sans); font-size: .86rem; color: var(--faint);
+  }
+  .cierre p { max-width: 76ch; margin: 0 0 10px; }
+</style>
+
+<div class="hoja">
+
+  <header class="portada">
+    <div class="membrete">
+      <span>Informe a la gerencia</span>
+      <span>Firma electrónica no cualificada de uso interno</span>
+      <span>3 de septiembre de 2026</span>
+    </div>
+    <h1>Vía a la firma interna</h1>
+    <p class="sumario">
+      Qué exige la normativa paraguaya para firmar electrónicamente los propios contratos, qué
+      requisitos bloquean hoy ese objetivo, y cuáles de las afirmaciones que sostienen esta
+      respuesta están contrastadas contra el texto oficial y cuáles todavía no.
+    </p>
+
+    <div class="titular">
+      <h2>La conclusión depende de una distinción que conviene fijar antes que nada</h2>
+      <p>
+        <strong>Firmar los propios contratos no es prestar un servicio de confianza.</strong> Un
+        servicio de confianza es el que se presta habitualmente a terceros a cambio de una
+        remuneración. Un sistema que firma las contrataciones de la propia empresa es un
+        mecanismo interno.
+      </p>
+      <p>
+        La consecuencia es grande: <strong>la firma interna no exige registro ante el
+        Ministerio</strong>, ni el perfil de certificado que el Ministerio aprueba para los
+        prestadores, ni ninguno de los tres bloqueantes que sí pesan sobre el negocio de prestar
+        el servicio a terceros.
+      </p>
+      <p>
+        <strong>La definición está verificada contra el texto de la ley</strong>, no heredada de
+        un resumen: es el numeral 48 de su artículo 4.º, transcripto en la sección 3. La
+        conclusión ya no descansa sobre una cita que nadie podía contrastar.
+      </p>
+    </div>
+  </header>
+
+  <section>
+    <p class="rotulo">Sección 1 · Qué se necesita</p>
+    <h2>Para la firma interna, lo exigible es la prueba, no el registro</h2>
+    <p class="entrada">
+      La firma electrónica no cualificada tiene validez jurídica por el principio de no
+      discriminación del artículo 39.1: no se le niegan efectos jurídicos ni admisibilidad en
+      procedimientos privados, judiciales y administrativos por el mero hecho de ser electrónica o
+      de no cumplir los requisitos de la cualificada.
+    </p>
+    <p>
+      Lo que <em>no</em> tiene es la <strong>equivalencia con la firma manuscrita</strong>. El
+      artículo 39.2 se la reconoce únicamente a la firma cualificada, y no la extiende a las
+      demás. La consecuencia práctica es que, impugnada la autenticidad, hay que probarla: el
+      artículo 40 remite al artículo 404 del Código Civil Paraguayo.
+    </p>
+    <p>
+      <strong>Corrección respecto de la documentación interna previa:</strong> los documentos de
+      diseño del proyecto atribuían esa remisión al artículo 308 del Código Procesal Civil. El
+      texto de la ley remite al <strong>404 del Código Civil</strong>. Es un ejemplo concreto de
+      por qué este informe distingue las citas verificadas de las heredadas.
+    </p>
+    <p>
+      De ahí que el requisito real de la firma interna no sea administrativo sino probatorio.
+      <strong>No hay trámite que habilite; hay un expediente que sostiene o no sostiene.</strong>
+      Lo que hay que construir es el registro de evidencias, no una inscripción.
+    </p>
+
+    <div class="marco">
+      <table>
+        <thead>
+          <tr><th scope="col">Requisito</th><th scope="col">¿Aplica a la firma interna?</th><th scope="col">Fundamento</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Comunicar el inicio de actividad al Ministerio</strong> (formulario <code>FOR-ICPP-02</code>, dentro de los 3 meses)</td>
+            <td><span class="chip si">No aplica</span></td>
+            <td>El artículo 15 impone la comunicación a los <em>prestadores</em> de servicios de confianza no cualificados. Un mecanismo interno no presta un servicio de confianza, según el artículo 4.º numeral 48.</td>
+          </tr>
+          <tr>
+            <td><strong>Ceñirse al perfil de certificado</strong> <code>DOC-ICPP-20 v2.0</code></td>
+            <td><span class="chip si">No aplica</span></td>
+            <td>Su §3 fija el perfil del certificado <em>del prestador</em> y su §4 el de las entidades finales que ese prestador emite. Sin prestador, no hay a quién aplicarlo.</td>
+          </tr>
+          <tr>
+            <td><strong>Certificado de una CA intermedia</strong> emitido bajo la infraestructura del Estado</td>
+            <td><span class="chip si">No aplica</span></td>
+            <td>Es el requisito de quien emite certificados a terceros. Una firma interna puede sostenerse sobre el expediente de evidencias sin emitir certificados nominales.</td>
+          </tr>
+          <tr>
+            <td><strong>Sellado de tiempo de una autoridad habilitada</strong></td>
+            <td><span class="chip ojo">Recomendable</span></td>
+            <td>No es exigible por la ley para un mecanismo interno, pero es lo único que acredita <em>cuándo</em> ocurrió el acto frente a un tercero. Sin él, la fecha la afirma la propia empresa — que es la parte interesada.</td>
+          </tr>
+          <tr>
+            <td><strong>Expediente de evidencias íntegro e inalterable</strong></td>
+            <td><span class="chip no">Sí — es el requisito real</span></td>
+            <td>Es lo que se exhibe cuando se impugna la autenticidad por la vía del artículo 40. Su ausencia no impide firmar: impide <strong>probar</strong> que se firmó.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <p class="rotulo">Sección 2 · Los bloqueantes</p>
+    <h2>Los tres bloqueantes del proyecto pesan sobre el negocio, no sobre el uso interno</h2>
+    <p class="entrada">
+      El proyecto lleva registrados tres requisitos que impiden ofrecer el servicio de firma
+      avanzada en producción. Vale distinguir a qué objetivo bloquea cada uno, porque no bloquean
+      al mismo.
+    </p>
+
+    <div class="marco">
+      <table>
+        <thead>
+          <tr><th scope="col">Bloqueante</th><th scope="col">Prestar a terceros</th><th scope="col">Firma interna</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Contratar la autoridad de sellado de tiempo</strong><br><span style="color:var(--muted)">Sin fecha cierta de un tercero, una firma con certificado de vida corta es inverificable a futuro.</span></td>
+            <td><span class="chip no">Bloquea</span></td>
+            <td><span class="chip ojo">Solo el nivel avanzado</span></td>
+          </tr>
+          <tr>
+            <td><strong>Emitir el certificado real de la CA intermedia</strong><br><span style="color:var(--muted)">Hoy el entorno de desarrollo usa una raíz autofirmada, marcada como no válida.</span></td>
+            <td><span class="chip no">Bloquea</span></td>
+            <td><span class="chip ojo">Solo el nivel avanzado</span></td>
+          </tr>
+          <tr>
+            <td><strong>Comunicar el inicio de actividades al Ministerio</strong><br><span style="color:var(--muted)">Plazo de tres meses desde el inicio efectivo de la prestación; exige inscripción previa en el registro de proveedores del Estado.</span></td>
+            <td><span class="chip no">Bloquea</span></td>
+            <td><span class="chip si">No aplica</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Lo que esto significa en la práctica</h3>
+    <p>
+      El servicio está construido en dos niveles. El <strong>nivel 1</strong> no modifica el
+      documento: produce un acta de evidencias sellada criptográficamente, que cualquier tercero
+      puede verificar con las claves públicas publicadas y sin intervención de la empresa. El
+      <strong>nivel 2</strong> agrega la firma incrustada en el PDF, con certificado del firmante
+      y sello de tiempo.
+    </p>
+    <p>
+      <strong>Los tres bloqueantes afectan al nivel 2.</strong> El nivel 1 no emite certificados
+      ni depende de una autoridad de sellado externa, de modo que para el objetivo de la firma
+      interna <em>no está bloqueado por ninguna razón normativa</em>. Lo que le falta es
+      despliegue: la infraestructura está escrita y probada, pero no hay ninguna cuenta de nube
+      donde haya sido aplicada.
+    </p>
+  </section>
+
+  <section>
+    <p class="rotulo">Sección 3 · Qué dice el texto oficial</p>
+    <h2>Lo que quedó acreditado leyendo la norma, no un resumen de ella</h2>
+    <p class="entrada">
+      Los documentos oficiales que hoy están en el repositorio del proyecto, leídos de primera
+      mano. Todo lo de esta sección se puede contrastar abriendo el archivo correspondiente.
+    </p>
+
+    <blockquote>
+      Servicio de confianza: el servicio electrónico <strong>prestado habitualmente a cambio de
+      una remuneración</strong>, consistente en: a) la creación, verificación y validación de
+      firmas electrónicas, sellos electrónicos, sellos de tiempo electrónicos, servicios de
+      entrega electrónica certificada y certificados relativos a estos servicios […]
+      <cite>Ley N.º 6822/2021, artículo 4.º, numeral 48</cite>
+    </blockquote>
+
+    <p>
+      Es la pieza que sostiene todo el encuadre. Si el servicio no se presta habitualmente a
+      cambio de una remuneración, no es un servicio de confianza, y las obligaciones dirigidas a
+      los <em>prestadores</em> no alcanzan a quien firma sus propias contrataciones.
+    </p>
+
+    <blockquote>
+      Los prestadores de servicios de confianza no cualificados no necesitan autorización
+      administrativa para iniciar su actividad, pero deben comunicar su actividad a la Autoridad
+      de Aplicación en el plazo de tres meses desde que la inicien.
+      <cite>Ley N.º 6822/2021, artículo 15</cite>
+    </blockquote>
+
+    <p>
+      La obligación está dirigida a <strong>los prestadores</strong>. El Decreto N.º 7576/2022 la
+      reglamenta en su artículo 5.º —solicitud mediante formulario y publicación del listado de
+      prestadores no cualificados en la web de la Autoridad— y agrega, en su artículo 6.º, la
+      comunicación de incidentes de seguridad <strong>dentro de las veinticuatro horas</strong> de
+      conocido el incidente, que alcanza a cualquiera que sí sea prestador.
+    </p>
+
+    <p>
+      El artículo 39.1 establece que no se negarán efectos jurídicos ni admisibilidad en
+      procedimientos privados, judiciales y administrativos a una firma electrónica por el mero
+      hecho de serlo o de no cumplir los requisitos de la cualificada. Su numeral 2 reserva a la
+      firma <em>cualificada</em> el efecto equivalente al de una firma manuscrita, y no lo extiende
+      a las demás. El artículo 40 remite, para la impugnación de autenticidad, al artículo 404 del
+      Código Civil Paraguayo.
+    </p>
+    <p>
+      El Ministerio de Industria y Comercio es la Autoridad de Aplicación por el artículo 96,
+      a través de la Dirección General de Comercio Electrónico.
+    </p>
+
+    <div class="marco">
+      <table>
+        <thead>
+          <tr><th scope="col">Documento</th><th scope="col">Qué acredita</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Ley N.º 6822/2021</strong><br>Texto completo, 47 páginas</td>
+            <td>Define el servicio de confianza (art. 4.º, num. 48), fija el efecto jurídico de la firma electrónica (art. 39) y su impugnación (art. 40), impone la comunicación de actividad a los prestadores no cualificados (art. 15) y designa la Autoridad de Aplicación (art. 96).</td>
+          </tr>
+          <tr>
+            <td><strong>Decreto N.º 7576/2022</strong><br>Reglamento de la ley</td>
+            <td>Reglamenta la comunicación de inicio de actividad (art. 5.º) y fija el plazo de <strong>24 horas</strong> para comunicar incidentes de seguridad (art. 6.º).</td>
+          </tr>
+          <tr>
+            <td><strong>Res. MIC N.º 1384</strong><br>6 de octubre de 2022</td>
+            <td>Reglamenta la comunicación de inicio y modificación de la prestación de servicios de confianza <strong>no cualificados</strong>. Su artículo 2.º aprueba el formulario <code>FOR-ICPP-02</code>; su artículo 3.º, el perfil de certificado del prestador.</td>
+          </tr>
+          <tr>
+            <td><strong>Res. MIC N.º 262</strong><br>4 de abril de 2024</td>
+            <td>Modifica el artículo 3.º de la anterior y aprueba el perfil <code>DOC-ICPP-20 v2.0</code>, dejando sin efecto la versión 1.0.</td>
+          </tr>
+          <tr>
+            <td><strong><code>DOC-ICPP-20 v2.0</code></strong><br>Anexo de la Res. 262/2024</td>
+            <td>El perfil técnico del certificado. Fija <code>Sha256withRsaEncryption</code> como algoritmo obligatorio en los tres perfiles, y una vigencia máxima de 4 años para el certificado de una persona.</td>
+          </tr>
+          <tr>
+            <td><strong><code>DOC-ICPP-01 v2.0</code></strong><br>Anexo de la Res. 0495/2026</td>
+            <td>Prácticas de la Autoridad Certificadora Raíz del país. Declara que su política criptográfica alcanza a la raíz «y, en lo pertinente, a los certificados emitidos a <strong>prestadores cualificados</strong>».</td>
+          </tr>
+          <tr>
+            <td><strong><code>DOC-ICPP-03</code> y <code>-07</code></strong><br>Res. 811 y 812 de 2022</td>
+            <td>Directivas para redactar la declaración de prácticas de los prestadores <strong>cualificados</strong>. No obligan a un prestador no cualificado, y mucho menos a un mecanismo interno.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <p class="rotulo">Sección 4 · Estado de la verificación</p>
+    <h2>Qué quedó contrastado y qué sigue apoyado en un resumen</h2>
+    <p class="entrada">
+      Esta sección existe porque un informe que no distingue entre lo que verificó y lo que
+      heredó de un resumen deja a quien decide sin manera de calibrar el riesgo. La versión
+      anterior de este informe advertía que su premisa central estaba sin contrastar; con el
+      texto de la ley a la vista, ya no lo está.
+    </p>
+
+    <div class="fuentes">
+      <div class="fuente con">
+        <span class="chip si">Contrastado</span>
+        <div>
+          <h3>La definición de servicio de confianza, que sostiene toda la conclusión</h3>
+          <p>
+            Artículo 4.º, numeral 48, transcripto en la sección 3. Dice literalmente «prestado
+            habitualmente a cambio de una remuneración». <strong>La premisa del informe está en el
+            texto de la ley.</strong>
+          </p>
+        </div>
+      </div>
+      <div class="fuente con">
+        <span class="chip si">Contrastado</span>
+        <div>
+          <h3>El efecto jurídico de la firma y la obligación de comunicar</h3>
+          <p>
+            Artículos 39, 40 y 15 de la ley, y artículos 5.º y 6.º del decreto reglamentario. Los
+            seis documentos normativos citados en este informe están en el repositorio en su
+            versión oficial.
+          </p>
+        </div>
+      </div>
+      <div class="fuente sin">
+        <span class="chip ojo">Una corrección, no una duda</span>
+        <div>
+          <h3>La documentación interna citaba mal la vía de impugnación</h3>
+          <p>
+            Los documentos de diseño remitían al artículo 308 del Código Procesal Civil. El
+            artículo 40 de la ley remite al <strong>artículo 404 del Código Civil</strong>. La
+            documentación del proyecto queda corregida; conviene revisar si esa cita se usó en
+            algún otro lado.
+          </p>
+        </div>
+      </div>
+      <div class="fuente sin">
+        <span class="chip ojo">Sin contrastar</span>
+        <div>
+          <h3>El artículo 404 del Código Civil</h3>
+          <p>
+            La ley remite a él, y no fue leído. De su contenido depende exactamente qué hay que
+            probar cuando se impugna la autenticidad de una firma, que es el requisito central de
+            la sección 1.
+          </p>
+        </div>
+      </div>
+      <div class="fuente sin">
+        <span class="chip ojo">Sin contrastar</span>
+        <div>
+          <h3>Las resoluciones del sector asegurador</h3>
+          <p>
+            Las obligaciones de conservación y de firma del corredor citadas en el diseño del
+            producto provienen de un análisis externo. Si la empresa opera en ese ramo, son las
+            que fijan el plazo de conservación de la evidencia.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin-top:24px">
+      Quedan dos documentos por conseguir, y ninguno afecta a la conclusión principal: el
+      artículo 404 del Código Civil, que precisa qué hay que probar, y las resoluciones del ramo
+      asegurador, que fijan plazos de conservación.
+    </p>
+  </section>
+
+  <section>
+    <p class="rotulo">Sección 5 · Qué decidir</p>
+    <h2>Cuatro decisiones, en orden de urgencia</h2>
+    <ol class="decisiones">
+      <li>
+        <div>
+          <h3>Confirmar por escrito el encuadre con asesoría legal paraguaya</h3>
+          <p>
+            El texto dice «prestado habitualmente a cambio de una remuneración», y la lectura es
+            directa. Lo que un dictamen agrega no es la interpretación sino la
+            <strong>oponibilidad</strong>: si el encuadre se discute, la empresa exhibe una opinión
+            profesional fechada y no una lectura propia.
+          </p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3>Conseguir el artículo 404 del Código Civil</h3>
+          <p>
+            Es la remisión del artículo 40, y de su contenido depende exactamente qué hay que
+            probar cuando se impugna una firma. Es el único documento que todavía falta para
+            cerrar el requisito central del informe.
+          </p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3>Decidir si el uso interno necesita el nivel avanzado</h3>
+          <p>
+            El nivel 1 —acta de evidencias verificable por un tercero, sin tocar el documento— no
+            tiene bloqueantes normativos y está construido. El nivel 2 agrega la firma dentro del
+            PDF y arrastra la contratación de la autoridad de sellado y la emisión del certificado.
+          </p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3>Habilitar la cuenta de nube para desplegar</h3>
+          <p>
+            La infraestructura está escrita y probada, y nunca fue aplicada contra una cuenta real.
+            Es el único obstáculo que hoy separa al nivel 1 de estar operativo, y no es normativo.
+          </p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <footer class="cierre">
+    <p>
+      Este informe distingue deliberadamente entre lo verificado y lo heredado. Donde dice
+      «sin contrastar» significa que la afirmación proviene de un documento de análisis y no del
+      texto normativo: sigue siendo la mejor información disponible, pero no es una cita que un
+      tercero pueda comprobar. La distinción no es retórica — al contrastar el texto apareció una
+      cita equivocada en la documentación interna, que este informe corrige.
+    </p>
+    <p>
+      No constituye asesoramiento legal. Las decisiones 1 y 2 existen precisamente para
+      reemplazarlo por uno.
+    </p>
+  </footer>
+
+</div>
