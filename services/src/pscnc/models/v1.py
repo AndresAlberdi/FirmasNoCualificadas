@@ -198,8 +198,14 @@ class ConfirmTransactionRequest(_Base):
     #: PDF a firmar, en base64. Se procesa en memoria y **no se conserva** salvo
     #: que el tenant contrate custodia de forma explícita (ADR-0007).
     document_content: bytes | None = None
-    #: Nombre del firmante para el `CN` del certificado efímero. Lo aporta el
-    #: tenant, que es quien verificó la identidad.
+    #: Nombre de pila del firmante, tal como figura en su documento. El perfil de
+    #: certificado lo exige como atributo propio, separado del apellido (ADR-0010).
+    signer_given_name: str | None = Field(default=None, max_length=100)
+    #: Apellido del firmante, tal como figura en su documento.
+    signer_surname: str | None = Field(default=None, max_length=100)
+    #: Anulador explícito del `CN`. Si no viene, el `CN` se compone con el nombre y
+    #: el apellido, que es como el perfil lo define. Sirve para el caso en que el
+    #: documento muestre el nombre completo en otro orden.
     signer_common_name: str | None = Field(default=None, max_length=200)
     #: Número de documento para el `serialNumber`, con el formato que exige la
     #: jurisdicción.

@@ -41,6 +41,7 @@ export type RejectionReason =
   | "INVALID_STATE"
   | "IDENTITY_NOT_APPROVED"
   | "INCOMPLETE_IDENTITY_DECISION"
+  | "INCOMPLETE_SIGNER_NAME"
   | "OTP_NOT_VERIFIED"
   | "OTP_NOT_FOR_TRANSACTION"
   | "OTP_INCORRECT_CODE"
@@ -135,7 +136,21 @@ export interface ConfirmTransactionRequest {
   // --- Solo nivel 2 -------------------------------------------------------
   /** PDF a firmar, en base64. No se conserva salvo custodia contratada. */
   readonly document_content?: string;
-  /** Nombre del firmante para el `CN` del certificado efímero. */
+  /**
+   * Nombre de pila del firmante, tal como figura en su documento. El perfil de
+   * certificado lo exige como atributo propio, separado del apellido.
+   *
+   * **Obligatorio para el nivel 2.** No se deduce de una sola cadena: partir
+   * «María José Ruiz Díaz» requiere conocer el documento, y un apellido mal
+   * partido produce un certificado que afirma algo que nadie declaró.
+   */
+  readonly signer_given_name?: string;
+  /** Apellido del firmante, tal como figura en su documento. Obligatorio en nivel 2. */
+  readonly signer_surname?: string;
+  /**
+   * Anulador explícito del `CN`. Si se omite, el `CN` se compone con el nombre y
+   * el apellido, que es como el perfil de certificado lo define.
+   */
   readonly signer_common_name?: string;
   /** Número de documento para el `serialNumber` del certificado. */
   readonly signer_national_id?: string;

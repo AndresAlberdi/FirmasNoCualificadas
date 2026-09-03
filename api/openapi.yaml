@@ -509,6 +509,18 @@ components:
             contentMediaType: application/octet-stream
           - type: 'null'
           title: Document Content
+        signer_given_name:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Signer Given Name
+        signer_surname:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Signer Surname
         signer_common_name:
           anyOf:
           - type: string
@@ -916,6 +928,7 @@ components:
       - INVALID_STATE
       - IDENTITY_NOT_APPROVED
       - INCOMPLETE_IDENTITY_DECISION
+      - INCOMPLETE_SIGNER_NAME
       - OTP_NOT_VERIFIED
       - OTP_NOT_FOR_TRANSACTION
       - OTP_INCORRECT_CODE

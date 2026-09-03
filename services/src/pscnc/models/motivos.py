@@ -44,6 +44,11 @@ class RejectionReason(StrEnum):
     #: vuelve a decidir la identidad: asienta la decisión ajena (ADR-0009).
     IDENTITY_NOT_APPROVED = "IDENTITY_NOT_APPROVED"
     INCOMPLETE_IDENTITY_DECISION = "INCOMPLETE_IDENTITY_DECISION"
+    #: El nivel 2 necesita el nombre y el apellido por separado, porque el perfil
+    #: de certificado los exige como atributos distintos. Partir una sola cadena
+    #: sería adivinar, y el error quedaría dentro de un documento probatorio
+    #: sin avisar a nadie (ADR-0010).
+    INCOMPLETE_SIGNER_NAME = "INCOMPLETE_SIGNER_NAME"
 
     # --------------------------------------------------------------- OTP ---
     OTP_NOT_VERIFIED = "OTP_NOT_VERIFIED"

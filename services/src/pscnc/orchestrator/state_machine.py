@@ -229,8 +229,13 @@ class SigningService:
             original,
             SubjectData.for_jurisdiction(
                 get_profile(item.jurisdiction),
-                common_name=item.identity_evidence.full_name,
+                # Acá nada se adivina: la evidencia de identidad guarda el nombre y
+                # el apellido por separado desde el primer día, porque es lo que
+                # devuelve la verificación documental (ADR-0010).
+                given_name=item.identity_evidence.first_name,
+                surname=item.identity_evidence.last_name,
                 national_id=item.identity_evidence.national_id,
+                document_type=item.identity_evidence.document_type,
                 transaction_id=transaction_id,
             ),
             visual=VisualSignatureSpec(
