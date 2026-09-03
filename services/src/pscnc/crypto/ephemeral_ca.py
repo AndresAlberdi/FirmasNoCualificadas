@@ -128,6 +128,8 @@ class EphemeralCertificateAuthority:
         ca_signer: CaSigner,
         crl_url: str,
         policy_oid: str | None = None,
+        cps_url: str | None = None,
+        user_notice: str | None = None,
         backdate_minutes: int = 5,
         validity_minutes: int = 15,
         environment: str = "prod",
@@ -136,6 +138,8 @@ class EphemeralCertificateAuthority:
         self._ca_signer = ca_signer
         self._crl_url = crl_url
         self._policy_oid = policy_oid or None
+        self._cps_url = cps_url or None
+        self._user_notice = user_notice or None
         self._backdate = timedelta(minutes=backdate_minutes)
         self._validity = timedelta(minutes=validity_minutes)
         self._environment = environment
@@ -243,6 +247,44 @@ class EphemeralCertificateAuthority:
             return f"{marca} {subject.organizational_unit} - TX {subject.transaction_id}"
         return f"{marca} {subject.organizational_unit}"
 
+    def _politica(self) -> x509.PolicyInformation:
+        """Política de certificación con sus dos calificadores.
+
+        El perfil no pide solo el identificador: exige además el puntero a la
+        declaración de prácticas y el aviso al usuario. Un identificador suelto no
+        dice dónde leer las condiciones bajo las que se emitió el certificado, que
+        es justamente para lo que sirve la extensión.
+
+        Los calificadores se omiten si no están configurados en lugar de inventarse:
+        una URL que no sirve la declaración de prácticas es peor que ninguna.
+        """
+        calificadores: list[x509.PolicyQualifierInfo] = []
+        if self._cps_url:
+            calificadores.append(
+                x509.PolicyQualifierInfo(
+                    {
+                        "policy_qualifier_id": "certification_practice_statement",
+                        "qualifier": x509.IA5String(self._cps_url),
+                    }
+                )
+            )
+        if self._user_notice:
+            calificadores.append(
+                x509.PolicyQualifierInfo(
+                    {
+                        "policy_qualifier_id": "user_notice",
+                        "qualifier": x509.UserNotice(
+                            {"explicit_text": x509.DisplayText(("utf8_string", self._user_notice))}
+                        ),
+                    }
+                )
+            )
+
+        politica: dict[str, object] = {"policy_identifier": self._policy_oid}
+        if calificadores:
+            politica["policy_qualifiers"] = calificadores
+        return x509.PolicyInformation(politica)
+
     def _signature_algorithm(self) -> algos.SignedDigestAlgorithm:
         nombre = ALGORITMOS_SOPORTADOS[self._ca_signer.signing_algorithm]
         if nombre == "rsassa_pss":
@@ -319,16 +361,31 @@ class EphemeralCertificateAuthority:
                 {
                     "extn_id": "key_usage",
                     "critical": True,
-                    # No repudio: el certificado solo sirve para firmar, nunca para cifrar.
-                    "extn_value": x509.KeyUsage({"digital_signature", "non_repudiation"}),
+                    # Los tres bits que el perfil de certificado marca en 1. El
+                    # `key_encipherment` incomoda —la clave vive quince minutos y
+                    # solo se usa para firmar, así que declarar cifrado no aporta
+                    # nada y amplía el uso—, pero el perfil lo marca obligatorio, y
+                    # apartarse «por criterio técnico» de un campo obligatorio es lo
+                    # que vuelve impugnable un certificado.
+                    "extn_value": x509.KeyUsage(
+                        {"digital_signature", "non_repudiation", "key_encipherment"}
+                    ),
                 }
             ),
             x509.Extension(
                 {
                     "extn_id": "extended_key_usage",
                     "critical": False,
+                    # Los dos primeros los enumera el perfil de certificado. El
+                    # tercero no figura en él, y se conserva a propósito: es el que
+                    # hace que Adobe reconozca el propósito del certificado, y el
+                    # perfil enumera dos OID sin declarar la lista cerrada. Que
+                    # admita adicionales es una de las preguntas de la consulta al
+                    # organismo (L-05 en `docs/PENDIENTES.md`); hasta tener
+                    # respuesta, quitarlo degradaría el producto por una regla que
+                    # puede no existir.
                     "extn_value": x509.ExtKeyUsageSyntax(
-                        ["email_protection", OID_DOCUMENT_SIGNING]
+                        ["email_protection", "client_auth", OID_DOCUMENT_SIGNING]
                     ),
                 }
             ),
@@ -385,9 +442,7 @@ class EphemeralCertificateAuthority:
                     {
                         "extn_id": "certificate_policies",
                         "critical": False,
-                        "extn_value": x509.CertificatePolicies(
-                            [x509.PolicyInformation({"policy_identifier": self._policy_oid})]
-                        ),
+                        "extn_value": x509.CertificatePolicies([self._politica()]),
                     }
                 )
             )

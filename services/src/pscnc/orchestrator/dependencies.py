@@ -98,6 +98,11 @@ def build_signing_service() -> SigningService:
         ca_signer=build_ca_signer(settings),
         crl_url=settings.crl_distribution_url,
         policy_oid=settings.cert_policy_oid,
+        cps_url=settings.cert_cps_url,
+        # El aviso al usuario es texto de producto de la jurisdicción, no del motor.
+        user_notice=require_profile(settings.jurisdiction, environment=settings.environment).text(
+            "certificado.aviso_de_uso"
+        ),
         backdate_minutes=settings.ephemeral_cert_backdate_minutes,
         validity_minutes=settings.ephemeral_cert_validity_minutes,
     )
@@ -247,6 +252,11 @@ def build_pades_signer(settings: Settings) -> PadesSigner:
         ca_signer=build_ca_signer(settings),
         crl_url=settings.crl_distribution_url,
         policy_oid=settings.cert_policy_oid,
+        cps_url=settings.cert_cps_url,
+        # El aviso al usuario es texto de producto de la jurisdicción, no del motor.
+        user_notice=require_profile(settings.jurisdiction, environment=settings.environment).text(
+            "certificado.aviso_de_uso"
+        ),
         backdate_minutes=settings.ephemeral_cert_backdate_minutes,
         validity_minutes=settings.ephemeral_cert_validity_minutes,
         environment=settings.environment,
