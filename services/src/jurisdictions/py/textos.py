@@ -51,6 +51,14 @@ TEXTOS: dict[str, str] = {
     # ----------------------------------------------------------- Firma ------
     "firma.motivo": "Firma Electronica No Cualificada - Ley N 6822/2021 (Paraguay)",
     "firma.lugar": "Paraguay",
+    # ------------------------------------------------------ Certificado -----
+    # Aviso al usuario del calificador `User Notice` de `certificatePolicies`.
+    # El perfil de certificado exige el calificador; el texto es de la
+    # jurisdicción, porque nombra la declaración de prácticas del prestador.
+    "certificado.aviso_de_uso": (
+        "Sujeto a las condiciones de uso expuestas en la Declaración de Prácticas "
+        "del prestador no cualificado de servicios de confianza emisor."
+    ),
     # ------------------------------------------------------- Rechazos -------
     "rechazo.acto_excluido": (
         "El documento contiene indicios de un acto jurídico que requiere forma solemne o "

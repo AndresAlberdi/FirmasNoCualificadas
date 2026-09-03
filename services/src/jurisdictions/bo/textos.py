@@ -62,4 +62,10 @@ TEXTOS: dict[str, str] = {
     "rechazo.documento_invalido": (
         "El número de documento no tiene el formato de una cédula de identidad boliviana."
     ),
+    # Estructural, como el resto del perfil: no hay constancia de qué exige la
+    # norma boliviana en este calificador.
+    "certificado.aviso_de_uso": (
+        "[SIN VERIFICAR] Sujeto a las condiciones de uso expuestas en la Declaración "
+        "de Prácticas del prestador emisor."
+    ),
 }

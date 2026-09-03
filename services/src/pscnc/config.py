@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     ca_cert_path: str = ""
     crl_distribution_url: str = ""
     cert_policy_oid: str = ""
+    #: URL pública de la Declaración de Prácticas, que viaja en el calificador
+    #: `CPS Pointer` de la extensión `certificatePolicies`.
+    cert_cps_url: str = ""
 
     ephemeral_cert_backdate_minutes: int = Field(default=5, ge=0, le=60)
     ephemeral_cert_validity_minutes: int = Field(default=15, ge=5, le=120)

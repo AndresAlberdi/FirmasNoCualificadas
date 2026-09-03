@@ -20,6 +20,8 @@ from pscnc.crypto.ephemeral_ca import EphemeralCertificateAuthority, SubjectData
 
 CRL_URL = "https://crl.pruebas.example.py/pscnc/intermediate.crl"
 POLICY_OID = "1.3.6.1.4.1.99999.1.1.1"
+CPS_URL = "https://pruebas.example.py/dpc"
+AVISO = "Sujeto a las condiciones de uso expuestas en la Declaración de Prácticas."
 
 
 @pytest.fixture()
@@ -29,6 +31,8 @@ def autoridad(ca_certificate_der, ca_signer):  # type: ignore[no-untyped-def]
         ca_signer=ca_signer,
         crl_url=CRL_URL,
         policy_oid=POLICY_OID,
+        cps_url=CPS_URL,
+        user_notice=AVISO,
         backdate_minutes=5,
         validity_minutes=15,
     )
@@ -166,9 +170,14 @@ def test_extensiones_obligatorias(autoridad, sujeto) -> None:  # type: ignore[no
 
     uso = extensiones.get_extension_for_class(cx509.KeyUsage)
     assert uso.critical is True
+    # Los tres bits que el perfil marca en 1, y los que marca en 0.
     assert uso.value.digital_signature is True
     assert uso.value.content_commitment is True  # non_repudiation
+    assert uso.value.key_encipherment is True
+    assert uso.value.data_encipherment is False
+    assert uso.value.key_agreement is False
     assert uso.value.key_cert_sign is False
+    assert uso.value.crl_sign is False
 
     puntos = extensiones.get_extension_for_class(cx509.CRLDistributionPoints)
     assert CRL_URL in str(puntos.value[0].full_name[0].value)
@@ -177,6 +186,54 @@ def test_extensiones_obligatorias(autoridad, sujeto) -> None:  # type: ignore[no
     assert politicas.value[0].policy_identifier.dotted_string == POLICY_OID
 
     assert extensiones.get_extension_for_class(cx509.AuthorityKeyIdentifier) is not None
+
+
+def test_el_uso_extendido_incluye_el_de_autenticacion_de_cliente(autoridad, sujeto) -> None:  # type: ignore[no-untyped-def]
+    """El perfil enumera dos OID: protección de correo y autenticación de cliente."""
+    emitido = autoridad.issue(sujeto)
+    certificado = cx509.load_der_x509_certificate(emitido.certificate_der)
+    usos = {
+        oid.dotted_string
+        for oid in certificado.extensions.get_extension_for_class(cx509.ExtendedKeyUsage).value
+    }
+
+    assert "1.3.6.1.5.5.7.3.4" in usos  # emailProtection
+    assert "1.3.6.1.5.5.7.3.2" in usos  # clientAuth
+
+
+def test_la_politica_lleva_sus_dos_calificadores(autoridad, sujeto) -> None:  # type: ignore[no-untyped-def]
+    """Un identificador suelto no dice dónde leer las condiciones de emisión.
+
+    Es para lo que sirve la extensión, y el perfil exige los dos calificadores
+    además del identificador.
+    """
+    emitido = autoridad.issue(sujeto)
+    certificado = cx509.load_der_x509_certificate(emitido.certificate_der)
+    politica = certificado.extensions.get_extension_for_class(cx509.CertificatePolicies).value[0]
+
+    calificadores = politica.policy_qualifiers
+    assert CPS_URL in calificadores
+    avisos = [c for c in calificadores if isinstance(c, cx509.UserNotice)]
+    assert avisos and avisos[0].explicit_text == AVISO
+
+
+def test_sin_calificadores_configurados_no_se_inventan(  # type: ignore[no-untyped-def]
+    ca_certificate_der, ca_signer, sujeto
+) -> None:
+    """Una URL que no sirve la declaración de prácticas es peor que ninguna."""
+    autoridad_minima = EphemeralCertificateAuthority(
+        ca_certificate_der=ca_certificate_der,
+        ca_signer=ca_signer,
+        crl_url=CRL_URL,
+        policy_oid=POLICY_OID,
+    )
+
+    emitido = autoridad_minima.issue(sujeto)
+    certificado = cx509.load_der_x509_certificate(emitido.certificate_der)
+    politica = certificado.extensions.get_extension_for_class(cx509.CertificatePolicies).value[0]
+
+    assert politica.policy_identifier.dotted_string == POLICY_OID
+    assert politica.policy_qualifiers is None
 
 
 def test_cada_emision_usa_una_clave_y_serie_distintas(autoridad, sujeto) -> None:  # type: ignore[no-untyped-def]

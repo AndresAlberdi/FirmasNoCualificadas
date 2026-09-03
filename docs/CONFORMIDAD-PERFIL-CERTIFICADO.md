@@ -7,8 +7,8 @@ hoy construye `services/src/pscnc/crypto/ephemeral_ca.py`.
 **Fuente:** `docs/diseno/normativa/doc-icpp-20-v2.0.pdf`, leído de primera mano. Última
 revisión: 2026-09-03.
 
-**Estado: parcialmente corregido.** De los seis apartamientos detectados, **P-01 y P-02
-están resueltos** —el `serialNumber` deriva de la sigla del documento y el sujeto lleva los
+**Estado: parcialmente corregido.** De los seis apartamientos detectados, **P-01, P-02 y la
+mayor parte de P-05 están resueltos** —el `serialNumber` deriva de la sigla del documento y el sujeto lleva los
 valores literales que fija el perfil— y P-03 quedó reducido a una sola pregunta abierta.
 Siguen pendientes P-04 y P-05. Ninguno afecta a `dev`, donde el
 certificado va deliberadamente rotulado como inválido; todos bloquean la emisión en
@@ -109,7 +109,7 @@ pila doble rompen cualquier heurística—, y en un certificado con valor probat
 es aceptable. Cerrar este punto **cambia el contrato con el tenant**, así que necesita su
 propio ADR y una versión compatible del SDK.
 
-### 2.5. `keyUsage` sin `keyEncipherment` — **obligatorio**
+### 2.5. `keyUsage` sin `keyEncipherment` — **corregido**
 
 | Bit | Norma §4.1 | Implementación |
 | :---- | :----: | :----: |
@@ -131,7 +131,7 @@ Aun así, **la conformidad con el perfil no es opcional para un prestador comuni
 apartarse «por criterio técnico» de un campo marcado obligatorio es precisamente lo que
 convierte un certificado en impugnable.
 
-### 2.6. `extendedKeyUsage` incompleto y con un OID ajeno — **obligatorio**
+### 2.6. `extendedKeyUsage` incompleto y con un OID ajeno — **corregido, con una decisión tomada**
 
 | Norma §4.1 | Implementación |
 | :---- | :---- |
@@ -146,13 +146,18 @@ certificado, así que quitarlo tiene costo práctico. La norma no prohíbe expre
 OID, pero tampoco los enumera como abiertos: **es una pregunta para la consulta al MIC**
 (L-05), junto con la de la OU.
 
-### 2.7. `certificatePolicies` incompleta y `authorityInfoAccess` ausente — **obligatorios**
+### 2.7. `certificatePolicies` incompleta y `authorityInfoAccess` ausente — **la primera corregida**
 
 La norma exige (campo 12) el `Policy Identifier` **más** los calificadores `CPS Pointer`
 (dirección web de la DPC) y `User Notice`. El código emite únicamente el `policy_identifier`,
 y solo si está configurado.
 
-El `authorityInfoAccess` (campo 15, obligatorio) **no se emite en absoluto**.
+El `authorityInfoAccess` (campo 15, obligatorio) **no se emite, y hoy no se puede emitir con
+verdad**: el campo apunta al método de acceso a la información de revocación —OCSP— y el
+servicio publica CRL. Declarar una URL de OCSP que nadie sirve sería una afirmación falsa
+en un documento probatorio, que es peor que la ausencia. La alternativa legítima es un
+`caIssuers` que apunte al certificado de la CA, pero ese certificado no existe todavía
+(B-02) ni se publica. Queda como P-05.
 
 El `crlDistributionPoints` (campo 14, obligatorio) se emite solo si hay URL configurada. Para
 un campo obligatorio, «si está configurado» no alcanza: la ausencia de configuración debería
