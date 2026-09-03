@@ -7,7 +7,7 @@
 ###############################################################################
 
 locals {
-  name = "pscnc-signer-${var.environment}"
+  name = "${var.resource_prefix}-signer-${var.environment}"
 }
 
 # ------------------------------------------------------------------- IAM ----
@@ -176,7 +176,7 @@ resource "aws_cloudwatch_log_group" "service" {
 
 # ------------------------------------------------------------------ ECS -----
 resource "aws_ecs_cluster" "this" {
-  name = "pscnc-${var.environment}"
+  name = "${var.resource_prefix}-${var.environment}"
 
   setting {
     name  = "containerInsights"

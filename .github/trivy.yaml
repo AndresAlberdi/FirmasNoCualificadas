@@ -42,6 +42,10 @@ scan:
     - "**/venv"
     - "**/.terraform"
     - "**/.security-reports"
+    # Checkouts del PROPIO repositorio: analizarlos duplica cada hallazgo del
+    # proyecto en vez de descubrir uno nuevo. No oculta nada — el mismo archivo
+    # se analiza igual en su ruta real.
+    - "**/.claude/worktrees"
   skip-files:
     - "**/*.min.js"
     - "**/*.map"

@@ -10,7 +10,7 @@
 ###############################################################################
 
 locals {
-  name = "pscnc-api-${var.environment}"
+  name = "${var.resource_prefix}-api-${var.environment}"
 }
 
 # ------------------------------------------------------------------ WAF -----
@@ -118,7 +118,7 @@ resource "aws_apigatewayv2_api" "b2b" {
   cors_configuration {
     allow_origins = var.allowed_cors_origins
     allow_methods = ["GET", "POST", "OPTIONS"]
-    allow_headers = ["authorization", "content-type", "x-pscnc-timestamp", "x-pscnc-signature"]
+    allow_headers = ["authorization", "content-type", "x-${var.resource_prefix}-timestamp", "x-${var.resource_prefix}-signature"]
     max_age       = 300
   }
 
