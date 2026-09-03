@@ -38,13 +38,20 @@ mano.
 
 | # | Qué hay que verificar | Qué decisión sostiene | Riesgo si es falsa |
 | :-- | :---- | :---- | :---- |
-| N-01 | **Texto de la Res. MIC N.º 262/2024 (`DOC-ICPP-20 v2.0`)**: qué algoritmos admite el perfil del certificado no cualificado | ADR-0006, elección de `RSA_4096` | Si admite ECDSA, se pierde una optimización. Si **exige** algo distinto de RSA-4096, el perfil emitido no cumple la norma |
+| N-01 | **Anexo `DOC-ICPP-20 v2.0`** de la Res. MIC N.º 262/2024: qué campos y qué algoritmos fija el perfil. La resolución ya está en `docs/diseno/normativa/`, pero es el acto que aprueba el perfil y **no lo contiene** | ADR-0006, elección de `RSA_4096` | Si admite ECDSA, se pierde una optimización. Si **exige** algo distinto de RSA-4096, el perfil emitido no cumple la norma |
+| N-05 | **¿`DOC-ICPP-20` rige el certificado del prestador o el que el prestador emite al firmante?** El título de la Res. 262/2024 y su art. 1.º dicen «del prestador»; el repositorio venía asumiendo que alcanza también al certificado efímero del firmante | ADR-0006 y la §4 de la DPSC, que especifica el perfil del certificado efímero «conforme a la Res. 262/2024» | Si solo rige el certificado del prestador, la §4 de la DPSC invoca una norma que no le aplica y el perfil del efímero queda sin respaldo declarado. Lo dirime el Anexo (N-01) |
+| N-06 | **Res. MIC N.º 1384/2022 y su Anexo II**, que la 262/2024 modifica parcialmente en su art. 3.º | El encuadre completo del perfil: qué quedó modificado y qué sigue vigente | Se cita la norma modificadora sin conocer la modificada |
 | N-02 | **Texto de la Res. SS.SG. N.º 210/2025**, arts. 4 y 9 | Norma citada en la constancia del perfil `PY` | La constancia citaría mal la norma que la habilita |
-| N-03 | **Ley N.º 6822/2021 y Decreto N.º 7576/2022** | Todo el marco de PSCNC | — |
+| N-03 | **Ley N.º 6822/2021 y Decreto N.º 7576/2022** | Todo el marco de PSCNC | — *(parcialmente respaldado: los considerandos de la Res. 262/2024 acreditan el art. 96 —el MIC como Autoridad de Aplicación a través de la Dirección General de Comercio Electrónico— y el plazo de tres meses para comunicar el inicio de actividad. El texto de la ley sigue sin estar en el repositorio)* |
 | N-04 | Número **PEN** de la organización para el OID de política de certificado | Extensión `certificatePolicies` | Hoy el OID es un marcador de posición |
 
 **Acción concreta:** los textos oficiales tienen que entrar al repositorio antes de que se
 los cite en producción. Una norma sin su PDF es una cita que nadie puede contrastar.
+
+**Los textos que ya entraron viven en `docs/diseno/normativa/`,** con un `LEEME.md` que
+distingue lo que cada uno acredita de lo que no. Conseguir un documento no cierra por sí
+solo la verificación que lo motivó: la Res. 262/2024 está en el repositorio y N-01 sigue
+abierto, porque lo que hace falta es su Anexo.
 
 ---
 

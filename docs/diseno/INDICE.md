@@ -148,6 +148,20 @@ ahí sale la asimetría que gobierna este proyecto:
 
 ---
 
+## 3. Textos normativos oficiales — `normativa/`
+
+Fuentes de primera mano, separadas del resto a propósito: los documentos de las secciones 1
+y 2 son análisis y especificaciones que **interpretan** las normas; los de `normativa/` son
+las normas. Cuando discrepan, manda el texto oficial.
+
+Hoy contiene la **Res. MIC N.º 262/2024**. Su `LEEME.md` detalla qué queda acreditado con
+ella y qué no: en particular, el PDF es el acto que aprueba el perfil y **no incluye el
+Anexo `DOC-ICPP-20 v2.0`**, que es donde están los campos y algoritmos del certificado. Por
+eso N-01 sigue abierto en `docs/PENDIENTES.md` aunque la resolución ya esté en el
+repositorio.
+
+---
+
 ## 3. Documento externo de referencia (no vive en este repositorio)
 
 `~/segurolotengo-demo/docs/VALIDACION_LEGAL_FIRMA_INTERNA.md` — validación legal del primer

@@ -54,8 +54,13 @@ razones, en orden de peso:
 3. El motor de firma ya está construido sobre RSA.
 
 **Salvedad que esta decisión no puede ocultar:** las dos primeras razones salen de
-documentos de análisis, **no del texto de la Res. MIC N.º 262/2024**, que no está en el
-repositorio y que nadie del equipo leyó de primera mano. Elegir ECDSA contra una norma que
+documentos de análisis, **no del perfil que la Res. MIC N.º 262/2024 aprueba**. El texto de
+la resolución ya está en `docs/diseno/normativa/res-mic-262-2024.pdf` y se leyó de primera
+mano, pero es el acto administrativo: aprueba el Anexo `DOC-ICPP-20 v2.0` sin contenerlo, de
+modo que los algoritmos siguen sin verificarse (N-01). Peor aún, su título y su artículo 1.º
+hablan del perfil **del certificado del prestador**, mientras este ADR razona sobre el
+certificado efímero que el prestador emite al firmante: puede que la norma que se invoca ni
+siquiera sea la que rige el caso (N-05). Elegir ECDSA contra una norma que
 no verificamos sería una apuesta; elegir RSA es alinearse con lo que el propio proyecto ya
 declaró. Verificar el texto de la resolución queda registrado en `docs/PENDIENTES.md`.
 
