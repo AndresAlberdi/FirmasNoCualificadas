@@ -69,7 +69,7 @@ seguridad:
         de tasa se incorpora en la fase de infraestructura, junto con el resto
         del perímetro que describe el blueprint. No hay infraestructura desplegada
         (produccion: false), de modo que hoy el hallazgo no tiene exposición.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_68
@@ -77,7 +77,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV2_AWS_47
@@ -85,7 +85,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_374
@@ -93,7 +93,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_310
@@ -101,7 +101,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_305
@@ -109,7 +109,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_86
@@ -117,7 +117,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV2_AWS_32
@@ -125,7 +125,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV2_AWS_31
@@ -133,7 +133,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Distribución de CloudFront que publica la lista de revocación. El contenido es público y está firmado por la CA, así que no hay confidencialidad ni integridad que un WAF, una restricción geográfica o una política de cabeceras protejan; el riesgo real es disponibilidad y costo. Se aborda junto con AWS-0011 en la fase de infraestructura (T-08). Sin infraestructura desplegada no hay exposición.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_144
@@ -141,7 +141,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Replicación entre regiones, notificaciones de evento y ciclo de vida de los buckets. La replicación es una decisión de costo que no está en el alcance del primer despliegue; las notificaciones no se usan porque la propagación al espejo WORM va por DynamoDB Streams. El ciclo de vida sí existe en el bucket de evidencias, que es el que conserva datos con plazo legal.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV2_AWS_62
@@ -149,7 +149,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Replicación entre regiones, notificaciones de evento y ciclo de vida de los buckets. La replicación es una decisión de costo que no está en el alcance del primer despliegue; las notificaciones no se usan porque la propagación al espejo WORM va por DynamoDB Streams. El ciclo de vida sí existe en el bucket de evidencias, que es el que conserva datos con plazo legal.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV2_AWS_61
@@ -157,7 +157,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Replicación entre regiones, notificaciones de evento y ciclo de vida de los buckets. La replicación es una decisión de costo que no está en el alcance del primer despliegue; las notificaciones no se usan porque la propagación al espejo WORM va por DynamoDB Streams. El ciclo de vida sí existe en el bucket de evidencias, que es el que conserva datos con plazo legal.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_300
@@ -165,7 +165,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Replicación entre regiones, notificaciones de evento y ciclo de vida de los buckets. La replicación es una decisión de costo que no está en el alcance del primer despliegue; las notificaciones no se usan porque la propagación al espejo WORM va por DynamoDB Streams. El ciclo de vida sí existe en el bucket de evidencias, que es el que conserva datos con plazo legal.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_18
@@ -173,7 +173,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Registro de acceso a los buckets. Exige un bucket de logs aparte con su propio ciclo de vida y política; se incorpora junto con el resto del perímetro en la fase de infraestructura. Los accesos a las claves ya quedan registrados en CloudTrail, que es la traza que sostiene la auditabilidad de una firma.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_309
@@ -181,7 +181,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Tipo de autorización de las rutas de API Gateway. La autenticación del servicio es HMAC-SHA256 verificada en la aplicación, con el inquilino derivado de la credencial (ADR-0005): un autorizador de API Gateway no aportaría el contexto de inquilino que el repositorio necesita, y duplicaría el control en dos lugares que pueden divergir.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_382
@@ -189,7 +189,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Egreso sin restringir en el grupo de seguridad del motor de firma, limitado al puerto 443. Mismo caso que la excepción AWS-0104 de Trivy: el servicio necesita alcanzar la autoridad de sellado de tiempo, cuyo rango se conocerá al contratarla (B-01). La corrección definitiva son los VPC endpoints más el egreso acotado (T-08).
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_260
@@ -197,7 +197,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Egreso sin restringir en el grupo de seguridad del motor de firma, limitado al puerto 443. Mismo caso que la excepción AWS-0104 de Trivy: el servicio necesita alcanzar la autoridad de sellado de tiempo, cuyo rango se conocerá al contratarla (B-01). La corrección definitiva son los VPC endpoints más el egreso acotado (T-08).
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_28
@@ -205,7 +205,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Recuperación a un punto en el tiempo en la tabla de idempotencia. Se desactiva a propósito: a diferencia de la evidencia, perder estos registros no destruye una prueba, y lo peor que produce es que un reintento se ejecute dos veces, cosa que la transacción ya rechaza. La tabla de auditoría sí lo tiene habilitado.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_272
@@ -213,7 +213,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Validación de firma de código en la función de publicación de CRL. Exige un perfil de firma de AWS Signer y un flujo de publicación firmado, que no existe todavía; el artefacto se construye en el mismo pipeline que lo despliega. Se aborda junto con la firma de artefactos de la cadena de suministro.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_252
@@ -221,7 +221,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Tema de SNS en CloudTrail. Las alarmas de seguridad ya publican en el tema de SecOps por CloudWatch, que es donde la guardia las recibe; una notificación por cada entrega de archivo de CloudTrail añadiría ruido sin destinatario que lo lea.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV2_AWS_3
@@ -229,7 +229,7 @@ seguridad:
       componente: infra
       justificacion: >-
         GuardDuty. Está parametrizado por `enable_guardduty` y se activa en los entornos que lo justifiquen; encenderlo en todos multiplicaría el costo del entorno de desarrollo sin señal que lo aproveche.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV2_AWS_64
@@ -237,7 +237,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Política de clave definida. Las claves del servicio la declaran de forma explícita (ADR-0006); el hallazgo alcanza a claves auxiliares del entorno de desarrollo, que usan la política predeterminada de la cuenta.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_109
@@ -245,7 +245,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Permisos de gestión sin restricción en políticas de IAM. Corresponden a las sentencias de administración de las claves, acotadas por principal a los roles de SecOps; el comodín está en el recurso porque una política de clave se evalúa sobre la clave que la contiene, no sobre un ARN externo.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_111
@@ -253,7 +253,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Permisos de gestión sin restricción en políticas de IAM. Corresponden a las sentencias de administración de las claves, acotadas por principal a los roles de SecOps; el comodín está en el recurso porque una política de clave se evalúa sobre la clave que la contiene, no sobre un ARN externo.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_150
@@ -261,7 +261,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Protección contra borrado del balanceador. En `dev` se omite a propósito para poder reconstruir el entorno; se habilita en producción, donde el recurso sí es duradero.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_91
@@ -269,7 +269,7 @@ seguridad:
       componente: infra
       justificacion: >-
         Registro de acceso del balanceador. Depende del bucket de logs de CKV_AWS_18 y se incorpora con él.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
     - id: CKV_AWS_117
@@ -277,6 +277,6 @@ seguridad:
       componente: infra
       justificacion: >-
         Función de CRL dentro de una VPC. Publica un archivo público en S3 y CloudFront y no accede a ningún recurso privado; meterla en la VPC exigiría endpoints o NAT sin reducir superficie.
-      aprobado_por: segurolotengopy
+      aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-02"
