@@ -53,16 +53,21 @@ razones, en orden de peso:
    aprobados por la Infraestructura de Clave Pública del Paraguay*.
 3. El motor de firma ya está construido sobre RSA.
 
-**Salvedad que esta decisión no puede ocultar:** las dos primeras razones salen de
-documentos de análisis, **no del perfil que la Res. MIC N.º 262/2024 aprueba**. El texto de
-la resolución ya está en `docs/diseno/normativa/res-mic-262-2024.pdf` y se leyó de primera
-mano, pero es el acto administrativo: aprueba el Anexo `DOC-ICPP-20 v2.0` sin contenerlo, de
-modo que los algoritmos siguen sin verificarse (N-01). Peor aún, su título y su artículo 1.º
-hablan del perfil **del certificado del prestador**, mientras este ADR razona sobre el
-certificado efímero que el prestador emite al firmante: puede que la norma que se invoca ni
-siquiera sea la que rige el caso (N-05). Elegir ECDSA contra una norma que
-no verificamos sería una apuesta; elegir RSA es alinearse con lo que el propio proyecto ya
-declaró. Verificar el texto de la resolución queda registrado en `docs/PENDIENTES.md`.
+**Verificado contra el texto oficial (2026-09-03).** La salvedad que llevaba este apartado
+—que las razones salían de documentos de análisis y nadie había leído la norma— ya no
+corresponde. El `DOC-ICPP-20 v2.0` está en `docs/diseno/normativa/` y **confirma la
+decisión**: sus tres perfiles fijan `Signature Algorithm = Sha256withRsaEncryption` y
+`Subject Public Key Info = RSA Encryption`, ambos con obligatoriedad «Sí». **Elegir ECDSA
+habría incumplido la norma.** El §4 del documento se titula «Perfiles de certificado de
+entidades finales», de modo que el perfil alcanza también al certificado efímero del
+firmante, no solo al del prestador.
+
+Queda un matiz que la verificación agrega y que antes no se veía: `Sha256withRsaEncryption`
+es **PKCS#1 v1.5**, no PSS — son dos OID distintos y la norma nombra uno solo. La
+configuración por defecto (`RSASSA_PKCS1_V1_5_SHA_256`) es la conforme, pero
+`ALGORITMOS_SOPORTADOS` sigue admitiendo `RSASSA_PSS_SHA_256`, que produciría un certificado
+fuera de perfil. El inventario completo de apartamientos está en
+`docs/CONFORMIDAD-PERFIL-CERTIFICADO.md`.
 
 Para que esa salvedad no se vuelva una trampa, **`CaSigner` no conoce el algoritmo**: lo
 recibe de la configuración y lo propaga al `AlgorithmIdentifier` del certificado. Si la

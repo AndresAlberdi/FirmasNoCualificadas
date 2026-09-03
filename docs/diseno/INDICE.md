@@ -154,11 +154,14 @@ Fuentes de primera mano, separadas del resto a propósito: los documentos de las
 y 2 son análisis y especificaciones que **interpretan** las normas; los de `normativa/` son
 las normas. Cuando discrepan, manda el texto oficial.
 
-Hoy contiene la **Res. MIC N.º 262/2024**. Su `LEEME.md` detalla qué queda acreditado con
-ella y qué no: en particular, el PDF es el acto que aprueba el perfil y **no incluye el
-Anexo `DOC-ICPP-20 v2.0`**, que es donde están los campos y algoritmos del certificado. Por
-eso N-01 sigue abierto en `docs/PENDIENTES.md` aunque la resolución ya esté en el
-repositorio.
+Contiene seis documentos: las resoluciones **1384/2022** y **262/2024**, el Anexo
+**`DOC-ICPP-20 v2.0`** —el perfil de certificado, que es la norma que rige el motor de
+firma—, y tres documentos de la ICPP dirigidos a los prestadores *cualificados*
+(`DOC-ICPP-01`, `-03`, `-07`) que no obligan a FNC pero describen qué espera el MIC.
+
+Su `LEEME.md` detalla qué acredita cada uno y a quién obliga. La lectura del `DOC-ICPP-20`
+confirmó la elección de RSA del ADR-0006 y abrió el inventario de apartamientos del
+certificado efímero que vive en `docs/CONFORMIDAD-PERFIL-CERTIFICADO.md`.
 
 ---
 
