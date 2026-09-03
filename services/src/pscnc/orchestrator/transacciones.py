@@ -465,11 +465,15 @@ class TransactionService:
                 transaction_id=transaccion.transaction_id,
             )
 
-        perfil_id = self._perfil(transaccion.jurisdiction)
+        perfil = self._perfil(transaccion.jurisdiction)
+
+        # El tipo de documento gobierna dos cosas: contra qué formato se valida el
+        # número y qué sigla lleva el `serialNumber` del certificado. Si el inquilino
+        # no lo declara se asume el principal de la jurisdicción — es la única
+        # suposición que queda, y está acotada acá.
+        tipo_documento = peticion.signer_document_type or perfil.default_document_type.code
         try:
-            perfil_id.validate_national_id(
-                perfil_id.document_types[0].code, peticion.signer_national_id
-            )
+            perfil.validate_national_id(tipo_documento, peticion.signer_national_id)
         except ValueError as exc:
             raise TransactionRejectedError(
                 RejectionReason.INVALID_IDENTITY_DOCUMENT,
@@ -479,7 +483,6 @@ class TransactionService:
 
         assert self._firmante_pades is not None  # comprobado al crear la transacción
 
-        perfil = self._perfil(transaccion.jurisdiction)
         try:
             return self._firmante_pades.sign(
                 peticion.document_content,
@@ -487,6 +490,7 @@ class TransactionService:
                     perfil,
                     common_name=peticion.signer_common_name,
                     national_id=peticion.signer_national_id,
+                    document_type=tipo_documento,
                     transaction_id=transaccion.transaction_id,
                 ),
             )

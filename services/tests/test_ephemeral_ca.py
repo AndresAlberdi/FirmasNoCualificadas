@@ -62,9 +62,86 @@ def test_sujeto_conforme_al_perfil_nacional(autoridad, sujeto) -> None:  # type:
     nombre = asn1_x509.Certificate.load(emitido.certificate_der).subject.native
 
     assert nombre["common_name"] == "Firmante De Prueba"
-    assert nombre["serial_number"] == "PY-4829153"
+    # Sigla del documento y no código de país: es lo que exige el perfil nacional.
+    assert nombre["serial_number"] == "CI4829153"
     assert nombre["country_name"] == "PY"
-    assert sujeto.transaction_id in nombre["organizational_unit_name"]
+    # El `O` declara qué clase de certificado es, con el literal que fija el perfil.
+    assert nombre["organization_name"] == "CERTIFICADO NO CUALIFICADO DE FIRMA ELECTRÓNICA"
+    # En producción la unidad organizativa vale exactamente lo que fija el perfil:
+    # el campo no admite agregados, ni siquiera el identificador de transacción.
+    assert nombre["organizational_unit_name"] == "FIRMA ELECTRÓNICA"
+
+
+def test_en_produccion_la_unidad_organizativa_no_lleva_nada_mas(autoridad, sujeto) -> None:  # type: ignore[no-untyped-def]
+    """El vínculo con la transacción no se pierde: vive en el número de serie.
+
+    El acta sellada registra el serial del certificado, así que el certificado y la
+    transacción siguen ligados sin necesidad de escribir el identificador en un
+    campo cuyo valor fija la norma.
+    """
+    emitido = autoridad.issue(sujeto)
+    nombre = asn1_x509.Certificate.load(emitido.certificate_der).subject.native
+
+    assert sujeto.transaction_id not in nombre["organizational_unit_name"]
+    assert emitido.serial_number
+
+
+def test_fuera_de_produccion_el_certificado_se_rotula_como_invalido(  # type: ignore[no-untyped-def]
+    ca_certificate_der, ca_signer, sujeto
+) -> None:
+    """La marca vive en un campo que cualquier visor muestra sin desplegar extensiones.
+
+    Apartarse del perfil acá no es un incumplimiento: en `dev` no somos un prestador
+    comunicado y el certificado no pretende ser oponible. La desviación **es** la
+    señal de que el artefacto no sirve como prueba.
+    """
+    autoridad_dev = EphemeralCertificateAuthority(
+        ca_certificate_der=ca_certificate_der,
+        ca_signer=ca_signer,
+        crl_url=CRL_URL,
+        policy_oid=POLICY_OID,
+        environment="dev",
+    )
+
+    emitido = autoridad_dev.issue(sujeto)
+    unidad = asn1_x509.Certificate.load(emitido.certificate_der).subject.native[
+        "organizational_unit_name"
+    ]
+
+    assert unidad.startswith("[NO VALIDO - ENTORNO DEV]")
+    assert "FIRMA ELECTRÓNICA" in unidad
+
+
+def test_los_dos_entornos_no_emiten_el_mismo_sujeto(  # type: ignore[no-untyped-def]
+    autoridad, ca_certificate_der, ca_signer, sujeto
+) -> None:
+    """Es la propiedad que sostiene la marca: si coincidieran, no distinguiría nada."""
+    autoridad_dev = EphemeralCertificateAuthority(
+        ca_certificate_der=ca_certificate_der,
+        ca_signer=ca_signer,
+        crl_url=CRL_URL,
+        environment="dev",
+    )
+
+    en_prod = asn1_x509.Certificate.load(autoridad.issue(sujeto).certificate_der).subject.native
+    en_dev = asn1_x509.Certificate.load(autoridad_dev.issue(sujeto).certificate_der).subject.native
+
+    assert en_prod["organizational_unit_name"] != en_dev["organizational_unit_name"]
+
+
+def test_el_pasaporte_produce_una_sigla_distinta(autoridad) -> None:  # type: ignore[no-untyped-def]
+    """Un certificado que dijera «CI» sobre un pasaporte afirmaría un documento falso."""
+    con_pasaporte = SubjectData.for_jurisdiction(
+        get_profile("PY"),
+        common_name="Firmante De Prueba",
+        national_id="AB123456",
+        document_type="PASAPORTE",
+    )
+
+    emitido = autoridad.issue(con_pasaporte)
+    nombre = asn1_x509.Certificate.load(emitido.certificate_der).subject.native
+
+    assert nombre["serial_number"] == "PASAB123456"
 
 
 def test_ventana_de_vigencia_corta(autoridad, sujeto) -> None:  # type: ignore[no-untyped-def]

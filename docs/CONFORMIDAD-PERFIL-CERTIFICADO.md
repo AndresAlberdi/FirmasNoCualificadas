@@ -7,8 +7,10 @@ hoy construye `services/src/pscnc/crypto/ephemeral_ca.py`.
 **Fuente:** `docs/diseno/normativa/doc-icpp-20-v2.0.pdf`, leído de primera mano. Última
 revisión: 2026-09-03.
 
-**Estado: no conforme.** Seis apartamientos, de los cuales cuatro son campos obligatorios
-ausentes o con valor distinto del que la norma fija. Ninguno afecta a `dev`, donde el
+**Estado: parcialmente corregido.** De los seis apartamientos detectados, **P-01 y P-02
+están resueltos** —el `serialNumber` deriva de la sigla del documento y el sujeto lleva los
+valores literales que fija el perfil— y P-03 quedó reducido a una sola pregunta abierta.
+Siguen pendientes P-04 y P-05. Ninguno afecta a `dev`, donde el
 certificado va deliberadamente rotulado como inválido; todos bloquean la emisión en
 producción.
 
@@ -38,7 +40,7 @@ Res. 262/2024 y que quedó registrada como N-05.
 
 ## 2. Los apartamientos
 
-### 2.1. `serialNumber` del sujeto con el prefijo equivocado — **obligatorio**
+### 2.1. `serialNumber` del sujeto con el prefijo equivocado — **corregido**
 
 La norma (§4.1, campo 6.4) exige:
 
@@ -56,7 +58,7 @@ documento (`CI_PY`, `PASAPORTE`); lo que falta es que el prefijo salga del tipo 
 Es exactamente el caso que el ADR-0008 previó: **si hubiera que tocar el motor, el perfil
 estaría incompleto**.
 
-### 2.2. `organizationName` del sujeto ausente — **obligatorio**
+### 2.2. `organizationName` del sujeto ausente — **corregido**
 
 La norma (campo 6.2) fija un valor literal:
 
@@ -65,7 +67,7 @@ La norma (campo 6.2) fija un valor literal:
 El `Name.build` actual arma el sujeto con `country_name`, `common_name`, `serial_number` y
 `organizational_unit_name`. **No hay `organization_name`.**
 
-### 2.3. `organizationalUnitName` con valor propio — **obligatorio**
+### 2.3. `organizationalUnitName` con valor propio — **corregido, con una pregunta abierta**
 
 La norma (campo 6.3) fija:
 

@@ -35,6 +35,12 @@ class DocumentType:
     label: str
     #: Expresión regular que valida el número. Debe anclarse en ambos extremos.
     pattern: str
+    #: Sigla que precede al número en el ``serialNumber`` del sujeto del
+    #: certificado. La fija el perfil de certificado de la jurisdicción, no el
+    #: código interno: el validador que lee un certificado distingue una cédula de
+    #: un pasaporte por esta sigla, y una equivocada afirma un tipo de documento
+    #: que el titular no presentó.
+    certificate_prefix: str = ""
 
     def matches(self, national_id: str) -> bool:
         return re.fullmatch(self.pattern, national_id) is not None
@@ -110,10 +116,18 @@ class JurisdictionProfile:
     signature_law_name: str
 
     document_types: tuple[DocumentType, ...]
-    #: Prefijo del ``serialNumber`` del certificado. Normalmente el código ISO.
-    certificate_serial_prefix: str
+    #: Prefijo de la clave del índice pericial por firmante. **No viaja en el
+    #: certificado**: es un identificador interno que solo desambigua entre países.
+    signer_index_prefix: str
     #: Valor del atributo ``C`` (país) del sujeto del certificado.
     certificate_country: str
+    #: Valor literal del atributo ``O`` del sujeto, tal como lo fija el perfil de
+    #: certificado de la jurisdicción. No es el nombre del prestador: el perfil
+    #: paraguayo lo usa para declarar **qué clase de certificado es**.
+    certificate_subject_organization: str
+    #: Valor literal del atributo ``OU`` del sujeto: la descripción del tipo de
+    #: certificado que fija el perfil.
+    certificate_subject_organizational_unit: str
 
     retention: EvidenceRetention
     restrictions: LegalActRestrictions
@@ -150,9 +164,33 @@ class JurisdictionProfile:
         if not tipo.matches(national_id):
             raise ValueError(f"El número no tiene el formato de {tipo.label} en {self.name}.")
 
-    def subject_serial_number(self, national_id: str) -> str:
-        """Valor del ``serialNumber`` del sujeto en el certificado X.509."""
-        return f"{self.certificate_serial_prefix}-{national_id}"
+    def subject_serial_number(self, national_id: str, *, document_type: str) -> str:
+        """Valor del ``serialNumber`` del sujeto en el certificado X.509.
+
+        Lo compone la **sigla del tipo de documento** seguida del número, y no el
+        código del país. Es lo que el perfil de certificado exige, y tiene una
+        razón: el ``serialNumber`` es el campo por el que un validador identifica
+        unívocamente al titular, y la sigla es lo que distingue una cédula de un
+        pasaporte. Un prefijo de país deja los dos indistinguibles.
+        """
+        tipo = self.document_type(document_type)
+        if not tipo.certificate_prefix:
+            raise ValueError(
+                f"El documento {document_type!r} de la jurisdicción {self.code} no declara "
+                "la sigla que debe llevar el `serialNumber` del certificado."
+            )
+        return f"{tipo.certificate_prefix}{national_id}"
+
+    @property
+    def default_document_type(self) -> DocumentType:
+        """Documento que se asume cuando el inquilino no declara cuál presentó.
+
+        Es el primero del catálogo. La suposición es visible a propósito: emitir un
+        certificado que afirma «cédula» sobre el número de un pasaporte es
+        exactamente la clase de afirmación falsa que el perfil existe para evitar,
+        de modo que el inquilino debería declararlo siempre que pueda.
+        """
+        return self.document_types[0]
 
     def signer_index_key(self, national_id: str) -> str:
         """Clave de partición del índice por firmante en la pista de auditoría.
@@ -161,7 +199,7 @@ class JurisdictionProfile:
         número de documento a personas distintas: sin él, el índice pericial
         mezclaría a dos firmantes bajo una sola clave.
         """
-        return f"CI#{self.certificate_serial_prefix}-{national_id}"
+        return f"CI#{self.signer_index_prefix}-{national_id}"
 
     # ----------------------------------------------------------------- Texto --
     def text(self, key: str) -> str:

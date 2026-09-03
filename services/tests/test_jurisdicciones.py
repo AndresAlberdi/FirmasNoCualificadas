@@ -193,8 +193,19 @@ class TestPerfilParaguayo:
     def test_cita_la_norma_de_la_constancia(self, perfil) -> None:  # type: ignore[no-untyped-def]
         assert "210/2025" in perfil.signature_law_citation
 
-    def test_serial_del_certificado(self, perfil) -> None:  # type: ignore[no-untyped-def]
-        assert perfil.subject_serial_number("4829153") == "PY-4829153"
+    def test_serial_del_certificado_lleva_la_sigla_del_documento(self, perfil) -> None:  # type: ignore[no-untyped-def]
+        """El perfil de certificado exige la sigla del documento, no el país."""
+        assert perfil.subject_serial_number("4829153", document_type="CI_PY") == "CI4829153"
+
+    def test_un_pasaporte_no_se_confunde_con_una_cedula(self, perfil) -> None:  # type: ignore[no-untyped-def]
+        """La sigla es lo único que los distingue ante un validador."""
+        assert perfil.subject_serial_number("AB123456", document_type="PASAPORTE") == "PASAB123456"
+
+    def test_el_sujeto_declara_los_valores_fijos_del_perfil(self, perfil) -> None:  # type: ignore[no-untyped-def]
+        assert perfil.certificate_subject_organization == (
+            "CERTIFICADO NO CUALIFICADO DE FIRMA ELECTRÓNICA"
+        )
+        assert perfil.certificate_subject_organizational_unit == "FIRMA ELECTRÓNICA"
 
     def test_clave_del_indice_por_firmante(self, perfil) -> None:  # type: ignore[no-untyped-def]
         assert perfil.signer_index_key("4829153") == "CI#PY-4829153"
@@ -254,8 +265,9 @@ class TestPerfilBoliviano:
         """Afirmar que un prestador está habilitado sin comprobarlo sería inventarlo."""
         assert perfil.timestamp_authorities == ()
 
-    def test_serial_del_certificado_lleva_su_propio_prefijo(self, perfil) -> None:  # type: ignore[no-untyped-def]
-        assert perfil.subject_serial_number("1234567-1K") == "BO-1234567-1K"
+    def test_serial_del_certificado_conserva_el_complemento(self, perfil) -> None:  # type: ignore[no-untyped-def]
+        """El complemento alfanumérico sobrevive a la composición del serial."""
+        assert perfil.subject_serial_number("1234567-1K", document_type="CI_BO") == "CI1234567-1K"
 
     def test_acepta_una_cedula_con_complemento_alfanumerico(self, perfil) -> None:  # type: ignore[no-untyped-def]
         """La diferencia que hace útil este perfil: rompe cualquier `^[0-9]+$`."""

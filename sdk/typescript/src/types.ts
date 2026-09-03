@@ -131,6 +131,24 @@ export interface ConfirmTransactionRequest {
   readonly document_sha256: string;
   readonly signer_ip?: string;
   readonly signer_user_agent?: string;
+
+  // --- Solo nivel 2 -------------------------------------------------------
+  /** PDF a firmar, en base64. No se conserva salvo custodia contratada. */
+  readonly document_content?: string;
+  /** Nombre del firmante para el `CN` del certificado efímero. */
+  readonly signer_common_name?: string;
+  /** Número de documento para el `serialNumber` del certificado. */
+  readonly signer_national_id?: string;
+  /**
+   * Tipo de documento presentado (`CI_PY`, `PASAPORTE`…), según el catálogo de
+   * la jurisdicción. Determina la **sigla** del `serialNumber`, que es lo que
+   * distingue una cédula de un pasaporte ante un validador.
+   *
+   * Es opcional por compatibilidad: si se omite, el servicio asume el documento
+   * principal de la jurisdicción. Declararlo evita que el certificado afirme un
+   * tipo de documento que el titular no presentó.
+   */
+  readonly signer_document_type?: string;
 }
 
 export interface TransactionCreated {
@@ -144,7 +162,7 @@ export interface TransactionCreated {
   readonly expires_at: string;
 }
 
-/** Lo que un tercero necesita para verify el acta por su cuenta. */
+/** Lo que un tercero necesita para verificar el acta por su cuenta. */
 export interface ActaSeal {
   readonly jws: string;
   readonly payload_sha256: string;

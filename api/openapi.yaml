@@ -521,6 +521,13 @@ components:
             maxLength: 30
           - type: 'null'
           title: Signer National Id
+        signer_document_type:
+          anyOf:
+          - type: string
+            maxLength: 21
+            pattern: ^[A-Z][A-Z0-9_]{1,20}$
+          - type: 'null'
+          title: Signer Document Type
       additionalProperties: false
       type: object
       required:

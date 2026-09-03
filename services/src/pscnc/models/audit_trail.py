@@ -79,8 +79,12 @@ class IdentityEvidence(_Base):
         return f"{self.first_name} {self.last_name}".strip()
 
     def subject_serial_number(self, profile: JurisdictionProfile) -> str:
-        """Identificador del sujeto en el certificado X.509, según la jurisdicción."""
-        return profile.subject_serial_number(self.national_id)
+        """Identificador del sujeto en el certificado X.509, según la jurisdicción.
+
+        Acá el tipo de documento no se supone: la evidencia de identidad ya lo trae,
+        porque es el documento que el inquilino declaró haber verificado.
+        """
+        return profile.subject_serial_number(self.national_id, document_type=self.document_type)
 
 
 # --------------------------------------------------------------------- Red

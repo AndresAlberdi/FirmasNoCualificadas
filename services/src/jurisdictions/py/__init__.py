@@ -81,15 +81,22 @@ PERFIL = JurisdictionProfile(
             label="cédula de identidad paraguaya",
             # Solo formato. El dígito verificador no se comprueba (T-03).
             pattern=r"[0-9]{4,15}",
+            certificate_prefix="CI",
         ),
         DocumentType(
             code="PASAPORTE",
             label="pasaporte",
             pattern=r"[A-Z0-9]{6,15}",
+            certificate_prefix="PAS",
         ),
     ),
-    certificate_serial_prefix="PY",
+    signer_index_prefix="PY",
     certificate_country="PY",
+    # Literales del perfil de certificado, con su tilde: ambos se codifican como
+    # `UTF8String` y sobreviven el viaje de ida y vuelta por ASN.1, así que no hay
+    # motivo para apartarse de cómo la norma los escribe.
+    certificate_subject_organization="CERTIFICADO NO CUALIFICADO DE FIRMA ELECTRÓNICA",
+    certificate_subject_organizational_unit="FIRMA ELECTRÓNICA",
     retention=EvidenceRetention(
         # Dos años desde el vencimiento del contrato (Res. 210/2025 art. 9). En la
         # práctica, la retención de S3 Object Lock se fija sobre el objeto y no sobre
