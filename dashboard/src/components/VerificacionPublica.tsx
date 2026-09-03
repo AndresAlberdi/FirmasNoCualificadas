@@ -1,5 +1,12 @@
-import { useCallback, useState } from 'react'
-import { AlertTriangle, BadgeCheck, FileSearch, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { useCallback, useMemo, useState } from 'react'
+import {
+  AlertTriangle,
+  BadgeCheck,
+  FileSearch,
+  ScanSearch,
+  ShieldAlert,
+  ShieldCheck,
+} from 'lucide-react'
 import {
   esArtefactoDePrueba,
   tieneFechaCierta,
@@ -7,6 +14,11 @@ import {
   type ClavePublicaJwk,
   type ResultadoVerificacion,
 } from '../lib/acta'
+import {
+  FncPublicClient,
+  constanciaCoincideConActa,
+  type ConstanciaPublica,
+} from '../lib/api'
 
 /**
  * Verificación pública del acta sellada.
@@ -26,6 +38,8 @@ const URL_CLAVES_POR_DEFECTO = '/.well-known/fnc-keys.json'
 
 interface Props {
   readonly onAuditar?: (detalle: string) => void
+  /** Inyectable para las pruebas. En el panel es el cliente real. */
+  readonly cliente?: FncPublicClient
 }
 
 type EstadoClaves =
@@ -34,7 +48,14 @@ type EstadoClaves =
   | { readonly fase: 'cargadas'; readonly claves: readonly ClavePublicaJwk[]; readonly origen: string }
   | { readonly fase: 'error'; readonly mensaje: string }
 
-export default function VerificacionPublica({ onAuditar }: Props) {
+export default function VerificacionPublica({ onAuditar, cliente }: Props) {
+  // Sin memoizar, el cliente se recrearía en cada render y arrastraría consigo
+  // la identidad del `useCallback` que lo usa.
+  const api = useMemo(() => cliente ?? new FncPublicClient(), [cliente])
+  const [codigo, setCodigo] = useState('')
+  const [constancia, setConstancia] = useState<ConstanciaPublica | null>(null)
+  const [errorConsulta, setErrorConsulta] = useState<string | null>(null)
+  const [consultando, setConsultando] = useState(false)
   const [urlClaves, setUrlClaves] = useState(URL_CLAVES_POR_DEFECTO)
   const [claves, setClaves] = useState<EstadoClaves>({ fase: 'sin-cargar' })
   const [jws, setJws] = useState('')
@@ -62,6 +83,58 @@ export default function VerificacionPublica({ onAuditar }: Props) {
     }
   }, [urlClaves])
 
+  const consultarPorCodigo = useCallback(async () => {
+    setConsultando(true)
+    setErrorConsulta(null)
+    setConstancia(null)
+    setResultado(null)
+    try {
+      const [respuestaClaves, respuestaConstancia] = await Promise.all([
+        api.clavesPublicas(),
+        api.constancia(codigo.trim()),
+      ])
+
+      if (!respuestaConstancia.ok) {
+        setErrorConsulta(respuestaConstancia.detalle)
+        onAuditar?.(`Consulta de constancia fallida: ${respuestaConstancia.motivo}`)
+        return
+      }
+      setConstancia(respuestaConstancia.datos)
+
+      const acta = respuestaConstancia.datos.acta_jws
+      if (!acta) {
+        setErrorConsulta(
+          'La constancia existe pero no trae el acta sellada, así que no hay nada que ' +
+            'comprobar criptográficamente.',
+        )
+        return
+      }
+      if (!respuestaClaves.ok) {
+        setErrorConsulta(
+          `No se pudieron obtener las claves públicas: ${respuestaClaves.detalle} ` +
+            'Sin ellas la firma del acta no se puede comprobar.',
+        )
+        return
+      }
+
+      setJws(acta)
+      setClaves({
+        fase: 'cargadas',
+        claves: respuestaClaves.datos,
+        origen: URL_CLAVES_POR_DEFECTO,
+      })
+      const veredicto = await verificarActa(acta, respuestaClaves.datos)
+      setResultado(veredicto)
+      onAuditar?.(
+        veredicto.valido
+          ? `Constancia ${codigo.trim()} verificada con la clave ${veredicto.kid}`
+          : `Constancia ${codigo.trim()} con acta inválida: ${veredicto.motivo}`,
+      )
+    } finally {
+      setConsultando(false)
+    }
+  }, [api, codigo, onAuditar])
+
   const verificar = useCallback(async () => {
     if (claves.fase !== 'cargadas') return
     const veredicto = await verificarActa(jws.trim(), claves.claves)
@@ -86,7 +159,43 @@ export default function VerificacionPublica({ onAuditar }: Props) {
         </p>
       </div>
 
+      <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-950/40 p-4">
+        <label className="etiqueta block" htmlFor="codigo-verificacion">
+          Código de verificación
+        </label>
+        <p className="text-xs text-slate-500">
+          Lo trae la constancia entregada al firmante. El panel consulta la API pública, que no
+          exige credenciales, y comprueba el acta acá mismo.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <input
+            id="codigo-verificacion"
+            className="min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-200"
+            placeholder="FNC-2026-XXXXXX"
+            value={codigo}
+            onChange={(evento) => setCodigo(evento.target.value)}
+          />
+          <button
+            type="button"
+            disabled={consultando || codigo.trim() === ''}
+            className="flex items-center gap-2 rounded-md bg-institucional-600 px-3 py-2 text-xs font-medium text-white hover:bg-institucional-500 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
+            onClick={() => void consultarPorCodigo()}
+          >
+            <ScanSearch className="h-3.5 w-3.5" aria-hidden />
+            {consultando ? 'Consultando…' : 'Consultar y verificar'}
+          </button>
+        </div>
+        {errorConsulta ? (
+          <p role="status" className="flex items-start gap-1.5 text-xs text-amber-300">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            {errorConsulta}
+          </p>
+        ) : null}
+        {constancia ? <Constancia constancia={constancia} resultado={resultado} /> : null}
+      </div>
+
       <div className="space-y-2">
+        <p className="etiqueta">O bien, comprobar un acta suelta</p>
         <label className="etiqueta block" htmlFor="url-claves">
           Origen de las claves públicas
         </label>
@@ -137,6 +246,39 @@ export default function VerificacionPublica({ onAuditar }: Props) {
 
       {resultado ? <Veredicto resultado={resultado} /> : null}
     </section>
+  )
+}
+
+function Constancia({
+  constancia,
+  resultado,
+}: {
+  readonly constancia: ConstanciaPublica
+  readonly resultado: ResultadoVerificacion | null
+}) {
+  // Dos fuentes afirman lo mismo sobre el mismo acto. Si no coinciden, una de
+  // las dos está mal, y eso es exactamente lo que un verificador debe ver.
+  const discrepa =
+    resultado?.valido === true && !constanciaCoincideConActa(constancia, resultado.contenido)
+
+  return (
+    <dl className="mt-3 grid gap-x-6 gap-y-2 border-t border-slate-800 pt-3 text-xs sm:grid-cols-2">
+      <Campo titulo="Estado" valor={constancia.status ?? '—'} />
+      <Campo titulo="Firmado el" valor={constancia.signed_at ?? '—'} />
+      <Campo titulo="Documento" valor={constancia.document_code ?? '—'} />
+      <Campo titulo="Huella del documento" valor={constancia.document_sha256 ?? '—'} />
+      <Campo titulo="Jurisdicción" valor={constancia.jurisdiction ?? '—'} />
+      <Campo titulo="Norma aplicable" valor={constancia.legal_basis ?? '—'} />
+      {discrepa ? (
+        <div className="sm:col-span-2">
+          <p className="flex items-start gap-1.5 rounded-md bg-rose-500/10 px-3 py-2 text-rose-200">
+            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            La constancia y el acta no describen el mismo acto. Una de las dos está mal, y
+            ninguna sirve como prueba hasta saber cuál.
+          </p>
+        </div>
+      ) : null}
+    </dl>
   )
 }
 

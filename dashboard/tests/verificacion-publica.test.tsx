@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import VerificacionPublica from '../src/components/VerificacionPublica'
+import { FncPublicClient } from '../src/lib/api'
 import type { ClavePublicaJwk } from '../src/lib/acta'
 
 const KID = 'alias/fnc/prod/aseguradora-py/acta-seal/v1'
@@ -210,5 +211,83 @@ describe('panel de verificación pública', () => {
     await usuario.type(screen.getByLabelText(/acta sellada/i), 'x')
 
     expect(screen.queryByText(/acta auténtica e íntegra/i)).not.toBeInTheDocument()
+  })
+})
+
+
+describe('consulta por código contra la API', () => {
+  /** Cliente con un `fetch` propio: no se toca la red en ninguna prueba. */
+  function clienteQueResponde(constancia: unknown): FncPublicClient {
+    return new FncPublicClient({
+      fetchImpl: (async (entrada: RequestInfo | URL) => {
+        const url = String(entrada)
+        if (url.includes('fnc-keys.json')) {
+          return new Response(JSON.stringify({ keys: [jwk] }), { status: 200 })
+        }
+        return new Response(JSON.stringify(constancia), { status: 200 })
+      }) as typeof globalThis.fetch,
+    })
+  }
+
+  it('trae la constancia, verifica su acta y muestra la norma aplicable', async () => {
+    const jws = await sellar(acta())
+    const usuario = userEvent.setup()
+    render(
+      <VerificacionPublica
+        cliente={clienteQueResponde({
+          verification_code: 'FNC-2026-000123',
+          exists: true,
+          status: 'SIGNING_COMPLETED',
+          document_sha256: 'a'.repeat(64),
+          jurisdiction: 'PY',
+          legal_basis: 'Ley N.º 6822/2021',
+          acta_jws: jws,
+        })}
+      />,
+    )
+
+    await usuario.type(screen.getByLabelText(/código de verificación/i), 'FNC-2026-000123')
+    await usuario.click(screen.getByRole('button', { name: /consultar y verificar/i }))
+
+    expect(await screen.findByText(/acta auténtica e íntegra/i)).toBeInTheDocument()
+    expect(screen.getByText('Ley N.º 6822/2021')).toBeInTheDocument()
+  })
+
+  it('avisa cuando la constancia y el acta no describen el mismo acto', async () => {
+    // Dos fuentes que se contradicen sobre el mismo acto: ninguna sirve como
+    // prueba hasta saber cuál está mal.
+    const jws = await sellar(acta())
+    const usuario = userEvent.setup()
+    render(
+      <VerificacionPublica
+        cliente={clienteQueResponde({
+          verification_code: 'FNC-2026-000123',
+          exists: true,
+          document_sha256: 'f'.repeat(64), // no es el del acta
+          jurisdiction: 'PY',
+          acta_jws: jws,
+        })}
+      />,
+    )
+
+    await usuario.type(screen.getByLabelText(/código de verificación/i), 'FNC-2026-000123')
+    await usuario.click(screen.getByRole('button', { name: /consultar y verificar/i }))
+
+    expect(await screen.findByText(/no describen el mismo acto/i)).toBeInTheDocument()
+  })
+
+  it('un código inexistente no se presenta como un fallo del servicio', async () => {
+    const usuario = userEvent.setup()
+    render(
+      <VerificacionPublica
+        cliente={clienteQueResponde({ verification_code: 'FNC-X', exists: false })}
+      />,
+    )
+
+    await usuario.type(screen.getByLabelText(/código de verificación/i), 'FNC-X')
+    await usuario.click(screen.getByRole('button', { name: /consultar y verificar/i }))
+
+    expect(await screen.findByText(/no corresponde a ninguna firma/i)).toBeInTheDocument()
+    expect(screen.queryByText(/acta auténtica/i)).not.toBeInTheDocument()
   })
 })
