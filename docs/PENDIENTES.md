@@ -111,6 +111,15 @@ del código, no en una comprobación automática.
 El bootstrap del estándar se ejecutó con `--sin-gh`: crear variables y secretos, y
 aplicar rulesets, son cambios en la cuenta de GitHub y no los hace un agente.
 
+**Dos identidades, a propósito.** `AndresAlberdi` es la persona que revisa y aprueba;
+`segurolotengopy` es la identidad de automatización que empuja ramas y abre los PR. No es
+una duplicación pendiente de limpiar: es lo que hace efectiva la separación de funciones.
+GitHub no permite aprobar el propio PR, de modo que si el agente abriera los PR con la
+cuenta de la persona, el ruleset de `main` no podría satisfacerse — y quitarle la
+aprobación obligatoria para resolverlo eliminaría la revisión por pares, que es la razón
+de ser del ruleset. Por eso `aprobado_por` de cada excepción de seguridad nombra a la
+persona: una excepción aprobada por la identidad de automatización no es una aprobación.
+
 **Secretos** (Settings → Secrets → Actions). Ninguno es imprescindible hoy, porque el
 manifiesto declara `produccion: false`:
 
