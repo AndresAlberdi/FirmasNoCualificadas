@@ -49,6 +49,7 @@ mano.
 
 | # | Qué hay que verificar | Qué decisión sostiene | Riesgo si es falsa |
 | :-- | :---- | :---- | :---- |
+| N-08 | **Ley N.º 4868/2013 y Decreto N.º 1165/2014**, sobre contratación electrónica | Obligaciones de información previa, resumen revisable, acuse de recibo y conservación que la revisión del primer tenant atribuye a esos textos, citando sus arts. 16 y 17 como relevantes para la pantalla de revisión y la entrega posterior | **No están en el repositorio**: ninguna de esas afirmaciones está contrastada |
 | N-02 | **Texto de la Res. SS.SG. N.º 210/2025**, arts. 4 y 9 | Norma citada en la constancia del perfil `PY` | La constancia citaría mal la norma que la habilita |
 | N-07 | **Artículo 404 del Código Civil Paraguayo** | Qué hay que probar cuando se impugna la autenticidad de una firma electrónica: es la remisión del art. 40 de la ley | Es el requisito central de la firma no cualificada y no está contrastado. Sustituye a la cita del art. 308 del Código Procesal Civil, que los documentos de análisis daban por buena y **es incorrecta** |
 | N-04 | Número **PEN** de la organización para el OID de política de certificado | Extensión `certificatePolicies` | Hoy el OID es un marcador de posición |
@@ -102,6 +103,8 @@ El orden de ataque sugerido y las tres preguntas que el texto no cierra están a
 
 | # | Pendiente | Por qué se difiere |
 | :-- | :---- | :---- |
+| T-19 | **El bloque de constancia no se emite todavía desde el flujo de firma** | `ConstanciaFirma` y su impresión están hechos y probados, pero el nivel 2 aún no lo arma a partir de la transacción: faltan el carácter en que se firma, el nombre del documento y el correlativo del tenant, que el contrato v1 no pide. Es un cambio de contrato y va con su ADR |
+| T-20 | **Decidir si la cédula del bloque va enmascarada o completa** | La revisión del tenant se contradice: su regla dice «cédula, al menos parcialmente» y su ejemplo muestra el número entero. El bloque viaja dentro del PDF que el firmante descarga y reenvía, así que es una decisión de exposición de datos y no de maquetación. Hoy el motor imprime lo que recibe: la política la fija quien despliega |
 | T-16 | **La infraestructura todavía supone que la cuenta de nube es de FNC** | El ADR-0011 traslada el despliegue al cliente —su cuenta, sus claves, su operación—, y de eso depende el encuadre legal entero, no solo el modelo comercial. Hay que revisar qué da por sentado el Terraform: nombres de bucket, políticas de clave que nombran principales nuestros, el rol de servicio, y la publicación de la CRL. **Mientras la operación siga de nuestro lado, la exención del art. 15 no se sostiene** |
 | T-13 | **La CA raíz autofirmada de `dev` se genera a mano, no con Terraform** | El encargo preveía generarla en la IaC. Hoy la producen las pruebas y el entorno local; falta el recurso de Terraform que la cree y la publique para `dev`. No bloquea el desarrollo del nivel 2 |
 | T-01 | **PAdES-B-LTA** para contratos de larga duración | Exige recolectar la cadena completa de validación (OCSP/CRL) e incrustarla en `/DSS`. El nivel B-T ya es suficiente mientras el sellado de tiempo esté garantizado (ADR-0004) |
