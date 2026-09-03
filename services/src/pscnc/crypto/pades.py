@@ -17,10 +17,16 @@ from __future__ import annotations
 
 import hashlib
 import io
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from jurisdictions import JurisdictionProfile
+from pscnc.crypto.constancia import (
+    ALTO_MINIMO,
+    ANCHO_MINIMO,
+    ConstanciaFirma,
+    componer_bloque,
+)
 from pscnc.crypto.ephemeral_ca import EphemeralCertificateAuthority, IssuedCertificate, SubjectData
 from pscnc.crypto.tsa import RecordingTimeStamper, TimestampResult
 from pscnc.errors import DocumentIntegrityError, SigningError, TimestampError
@@ -39,6 +45,23 @@ class VisualSignatureSpec:
     y: float = 150.0
     width: float = 180.0
     height: float = 60.0
+    #: Bloque de constancia a imprimir dentro del campo. Si viene, la apariencia
+    #: deja de ser un rótulo y pasa a ser el bloque completo con su QR.
+    constancia: ConstanciaFirma | None = None
+
+    def con_espacio_para_la_constancia(self) -> VisualSignatureSpec:
+        """Agranda la caja si hace falta para que el bloque no se recorte.
+
+        Un bloque recortado es peor que ninguno: deja a la vista media huella y
+        media declaración, y las dos cosas dejan de significar lo que dicen.
+        """
+        if self.constancia is None:
+            return self
+        return replace(
+            self,
+            width=max(self.width, ANCHO_MINIMO),
+            height=max(self.height, ALTO_MINIMO),
+        )
 
     @property
     def box(self) -> tuple[int, int, int, int]:
@@ -89,6 +112,9 @@ class PadesSigner:
         # constante (ADR-0008).
         self._reason = jurisdiction.text("firma.motivo")
         self._location = jurisdiction.text("firma.lugar")
+        # El perfil se conserva entero: el bloque de constancia toma de él sus
+        # rótulos y su declaración de consentimiento.
+        self._jurisdiction = jurisdiction
 
     def sign(
         self,
@@ -114,7 +140,7 @@ class PadesSigner:
             pdf_bytes,
             emitido,
             timestamper=timestamper,
-            visual=visual or VisualSignatureSpec(),
+            visual=(visual or VisualSignatureSpec()).con_espacio_para_la_constancia(),
             field_name=field_name,
         )
 
@@ -145,6 +171,32 @@ class PadesSigner:
         )
 
     # -------------------------------------------------------------- Interno --
+    def _estilo_de_sello(self, visual: VisualSignatureSpec) -> Any:
+        """Estilo de la apariencia del campo de firma.
+
+        Sin constancia devuelve ``None`` y pyHanko usa su apariencia por defecto.
+        Con constancia, la apariencia **es** el bloque: los datos que el firmante
+        y un tercero necesitan leer sin abrir ningún panel, más un QR con la
+        dirección de la constancia pública.
+
+        El QR no es adorno. La huella se imprime abreviada para que entre; el
+        valor completo vive en la constancia, y el QR es lo que lleva hasta ella
+        sin obligar a nadie a transcribir sesenta y cuatro caracteres.
+        """
+        if visual.constancia is None:
+            return None
+
+        from pyhanko.pdf_utils import text as pdf_text
+        from pyhanko.stamp import QRStampStyle
+
+        # `%(url)s` queda fuera del texto a propósito: la dirección ya está en el
+        # QR, y repetirla en letra chica no ayuda a nadie. pyHanko exige que el
+        # parámetro exista igual, y se lo pasa `_apply_signature`.
+        return QRStampStyle(
+            stamp_text=componer_bloque(visual.constancia, self._jurisdiction),
+            text_box_style=pdf_text.TextBoxStyle(font_size=7),
+        )
+
     def _apply_signature(
         self,
         pdf_bytes: bytes,
@@ -196,13 +248,23 @@ class PadesSigner:
             signer=signer,
             timestamper=timestamper,
             new_field_spec=field_spec,
+            stamp_style=self._estilo_de_sello(visual),
         )
 
         entrada = io.BytesIO(pdf_bytes)
         salida = io.BytesIO()
         try:
             writer = IncrementalPdfFileWriter(entrada)
-            pdf_signer.sign_pdf(writer, output=salida, in_place=False)
+            pdf_signer.sign_pdf(
+                writer,
+                output=salida,
+                in_place=False,
+                appearance_text_params=(
+                    {"url": visual.constancia.url_verificacion}
+                    if visual.constancia is not None
+                    else None
+                ),
+            )
         except TimestampError:
             # El fallo del sellado se deja pasar tal cual, sin envolverlo: la causa
             # es lo que decide qué puede hacer el llamador. Una autoridad de
