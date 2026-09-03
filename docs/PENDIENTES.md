@@ -20,15 +20,21 @@ prestador. Lo que abre es un inventario de apartamientos concretos:
 
 ## 1. Bloqueantes del nivel 2 en producción
 
-Las tres condiciones del ADR-0007. Hasta que las tres se cumplan, **el nivel 2 no puede
-ofrecerse a ningún tenant en producción**, con independencia de que el código esté terminado
-y probado.
+**Reencuadrado por el ADR-0011.** FNC dejó de ser prestador, así que estos requisitos ya no
+bloquean al proyecto: **B-03 no aplica**, y B-01 y B-02 pasan a ser condiciones que debe
+cumplir el *cliente* que quiera operar el nivel 2 en producción. FNC entrega el motor capaz de
+usarlas.
+
+Lo que no cambia es la regla: sin fecha cierta de un tercero y sin una CA real, una firma con
+certificado efímero es inverificable a futuro. El art. 63.1.b de la ley lo confirma incluso
+para la firma cualificada, que **no hace fe respecto de la fecha** sin sello de tiempo de un
+prestador cualificado.
 
 | # | Pendiente | Depende de | Estado |
 | :-- | :---- | :---- | :---- |
-| B-01 | **Contratar la TSA cualificada** con un PCSC habilitado en Paraguay (Confirma, VIT, CODE 100, Documenta, SOS Tecnología). Sin fecha cierta de un tercero, una firma con certificado efímero es inverificable a futuro (ADR-0004) | Negocio | Abierto |
-| B-02 | **Emitir el certificado real de la CA intermedia** sobre la clave que ya vive en KMS. Hoy `dev` usa una raíz autofirmada generada por Terraform | SecOps + PKI | Abierto |
-| B-03 | **Presentar el formulario `FOR-ICPP-02`** ante la DGFDCE del MIC y aparecer en el listado público de PSCNC. El formulario lo aprueba el art. 2.º de la Res. 1384/2022 (Anexo I). Plazo legal: 3 meses desde el inicio efectivo de la prestación. Requiere REPSE previo | Legal + Negocio | Abierto |
+| B-01 | *(pasa al cliente)* **Contratar la TSA cualificada** con un PCSC habilitado en Paraguay (Confirma, VIT, CODE 100, Documenta, SOS Tecnología). Sin fecha cierta de un tercero, una firma con certificado efímero es inverificable a futuro (ADR-0004) | Negocio | Abierto |
+| B-02 | *(pasa al cliente)* **Emitir el certificado real de la CA intermedia** sobre la clave que ya vive en KMS. Hoy `dev` usa una raíz autofirmada generada por Terraform | SecOps + PKI | Abierto |
+| ~~B-03~~ | ~~**Presentar el formulario `FOR-ICPP-02`** ante la DGFDCE del MIC~~ **Cerrado por el ADR-0011: no aplica.** El art. 15 de la ley dirige la obligación a los *prestadores*, y FNC dejó de serlo. Reaparecería si el modelo de entrega pasara a alojamiento gestionado por FNC | — | **No aplica** |
 
 Mientras tanto, `dev` opera con CA autofirmada y TSA de prueba **etiquetadas en cada
 certificado y en cada acta** (`environment=dev`, `tsa=test`).
@@ -96,6 +102,7 @@ El orden de ataque sugerido y las tres preguntas que el texto no cierra están a
 
 | # | Pendiente | Por qué se difiere |
 | :-- | :---- | :---- |
+| T-16 | **La infraestructura todavía supone que la cuenta de nube es de FNC** | El ADR-0011 traslada el despliegue al cliente —su cuenta, sus claves, su operación—, y de eso depende el encuadre legal entero, no solo el modelo comercial. Hay que revisar qué da por sentado el Terraform: nombres de bucket, políticas de clave que nombran principales nuestros, el rol de servicio, y la publicación de la CRL. **Mientras la operación siga de nuestro lado, la exención del art. 15 no se sostiene** |
 | T-13 | **La CA raíz autofirmada de `dev` se genera a mano, no con Terraform** | El encargo preveía generarla en la IaC. Hoy la producen las pruebas y el entorno local; falta el recurso de Terraform que la cree y la publique para `dev`. No bloquea el desarrollo del nivel 2 |
 | T-01 | **PAdES-B-LTA** para contratos de larga duración | Exige recolectar la cadena completa de validación (OCSP/CRL) e incrustarla en `/DSS`. El nivel B-T ya es suficiente mientras el sellado de tiempo esté garantizado (ADR-0004) |
 | T-02 | **Habilitación comercial de la jurisdicción `BO`** | El perfil es estructural y está marcado `sin_validacion_legal`. Exige documentos fuente bolivianos y revisión legal local (ADR-0008) |
