@@ -59,6 +59,32 @@ TEXTOS: dict[str, str] = {
         "Sujeto a las condiciones de uso expuestas en la Declaración de Prácticas "
         "del prestador no cualificado de servicios de confianza emisor."
     ),
+    # --------------------------------------------------- Constancia visible --
+    # Rótulos del bloque que se imprime dentro del PDF firmado. Son texto de
+    # producto de la jurisdicción: el motor no los conoce.
+    "bloque_firma.titulo": "FIRMA ELECTRONICA DEL PROPONENTE",
+    "bloque_firma.firmante": "Firmante",
+    "bloque_firma.documento": "Documento de identidad",
+    "bloque_firma.caracter": "Caracter",
+    "bloque_firma.documento_firmado": "Documento firmado",
+    "bloque_firma.codigo": "Codigo de solicitud",
+    "bloque_firma.fecha": "Fecha y hora de firma",
+    "bloque_firma.autenticacion": "Metodo de autenticacion",
+    "bloque_firma.operacion": "Identificador de la operacion",
+    "bloque_firma.version": "Version del documento",
+    "bloque_firma.huella": "Huella digital SHA-256",
+    "bloque_firma.estado": "Estado",
+    "bloque_firma.estado_validada": "Firma electronica validada",
+    # La declaración de consentimiento. Es lo único del bloque que no describe un
+    # dato sino que afirma un acto, y por eso su redacción es materia legal: se
+    # revisa con asesoría antes de cambiarla (L-01 de docs/PENDIENTES.md).
+    "bloque_firma.declaracion": (
+        "El firmante declara haber revisado integramente este documento y manifiesta "
+        "su consentimiento libre, expreso e inequivoco respecto de la solicitud, las "
+        "declaraciones, autorizaciones y condiciones contenidas en el. La firma "
+        "electronica se encuentra vinculada al presente documento mediante su "
+        "identificador unico y huella digital."
+    ),
     # ------------------------------------------------------- Rechazos -------
     "rechazo.acto_excluido": (
         "El documento contiene indicios de un acto jurídico que requiere forma solemne o "

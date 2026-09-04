@@ -19,7 +19,10 @@ dependencies = [
     "python-multipart>=0.0.12",
     "boto3>=1.35,<2.0",
     "botocore>=1.35,<2.0",
-    "pyhanko[pkcs11]>=0.25,<1.0",
+    # El extra `qr` trae `qrcode`, que pyHanko necesita para el sello con QR
+    # del bloque de constancia. Sin él la firma con apariencia falla en tiempo
+    # de ejecución y no al arrancar, que es el peor momento para enterarse.
+    "pyhanko[pkcs11,qr]>=0.25,<1.0",
     "pyhanko-certvalidator>=0.26,<1.0",
     "asn1crypto>=1.5,<2.0",
     # >=6.14.2 corrige las CVE de denegación de servicio por PDF manipulado.

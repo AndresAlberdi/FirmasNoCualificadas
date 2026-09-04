@@ -68,4 +68,20 @@ TEXTOS: dict[str, str] = {
         "[SIN VERIFICAR] Sujeto a las condiciones de uso expuestas en la Declaración "
         "de Prácticas del prestador emisor."
     ),
+    # Estructural. La redacción y los rótulos dependen de la norma boliviana,
+    # que sigue sin verificar.
+    "bloque_firma.titulo": "[SIN VERIFICAR] titulo",
+    "bloque_firma.firmante": "[SIN VERIFICAR] firmante",
+    "bloque_firma.documento": "[SIN VERIFICAR] documento",
+    "bloque_firma.caracter": "[SIN VERIFICAR] caracter",
+    "bloque_firma.documento_firmado": "[SIN VERIFICAR] documento firmado",
+    "bloque_firma.codigo": "[SIN VERIFICAR] codigo",
+    "bloque_firma.fecha": "[SIN VERIFICAR] fecha",
+    "bloque_firma.autenticacion": "[SIN VERIFICAR] autenticacion",
+    "bloque_firma.operacion": "[SIN VERIFICAR] operacion",
+    "bloque_firma.version": "[SIN VERIFICAR] version",
+    "bloque_firma.huella": "[SIN VERIFICAR] huella",
+    "bloque_firma.estado": "[SIN VERIFICAR] estado",
+    "bloque_firma.estado_validada": "[SIN VERIFICAR] estado validada",
+    "bloque_firma.declaracion": "[SIN VERIFICAR] declaracion",
 }
