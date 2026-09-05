@@ -29,7 +29,7 @@ dependencies = [
     "pypdf>=6.14.2,<7.0",
     "cryptography>=43.0",
     "requests>=2.32,<3.0",
-    "reportlab>=4.2,<5.0",
+    "reportlab>=4.2,<6.0",
     "structlog>=24.4,<25.0",
     # Canonicalización JSON (RFC 8785). Sin un orden de claves determinista,
     # dos serializaciones del mismo acta dan hashes distintos y la
