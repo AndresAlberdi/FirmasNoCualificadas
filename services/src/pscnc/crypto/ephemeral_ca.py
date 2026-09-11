@@ -174,6 +174,19 @@ class EphemeralCertificateAuthority:
         return self._environment
 
     @property
+    def marca_de_entorno(self) -> str | None:
+        """Marca que distingue a simple vista un artefacto que no vale como prueba.
+
+        ``None`` en producción. Fuera de ella, la misma marca va en la unidad
+        organizativa del certificado y en el bloque visible de constancia: si
+        cada uno la escribiera por su cuenta, un cambio en uno dejaría al otro
+        diciendo algo distinto sobre el mismo documento.
+        """
+        if self.is_production:
+            return None
+        return f"[NO VALIDO - ENTORNO {self._environment.upper()}]"
+
+    @property
     def ca_serial_number(self) -> str:
         return str(self._ca_cert.serial_number)
 
@@ -251,9 +264,9 @@ class EphemeralCertificateAuthority:
         registra el número de serie del certificado. Dónde se reubica el
         identificador es una decisión abierta (P-03 en `docs/PENDIENTES.md`).
         """
-        if self.is_production:
+        marca = self.marca_de_entorno
+        if marca is None:
             return subject.organizational_unit
-        marca = f"[NO VALIDO - ENTORNO {self._environment.upper()}]"
         if subject.transaction_id:
             return f"{marca} {subject.organizational_unit} - TX {subject.transaction_id}"
         return f"{marca} {subject.organizational_unit}"
