@@ -83,3 +83,21 @@ class TestFlujoHeredado:
     ) -> None:
         """Contraprueba: sin ella, la anterior pasaría con un sellador que nunca lo es."""
         assert _sellador(_servicio(monkeypatch, "prod")).qualified is True
+
+    @pytest.mark.parametrize("entorno", ["dev", "staging"])
+    def test_fuera_de_prod_el_certificado_lleva_la_marca_del_entorno(  # type: ignore[no-untyped-def]
+        self, configuracion, monkeypatch, entorno
+    ) -> None:
+        """De `environment` sale la marca `[NO VALIDO - ENTORNO …]` de la OU.
+
+        Una CA que no lo recibe asume producción y emite un certificado de
+        desarrollo que no se distingue de uno real.
+        """
+        autoridad = _servicio(monkeypatch, entorno)._ca
+        assert autoridad.environment == entorno
+        assert autoridad.is_production is False
+
+    def test_en_prod_el_certificado_no_lleva_marca_de_entorno(  # type: ignore[no-untyped-def]
+        self, configuracion, monkeypatch
+    ) -> None:
+        assert _servicio(monkeypatch, "prod")._ca.is_production is True
