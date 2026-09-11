@@ -148,6 +148,7 @@ def servicio(ca_certificate_der, ca_signer):  # type: ignore[no-untyped-def]
         timestamper_factory=lambda: RecordingTimeStamper(
             "",
             provider_name="TSA de Pruebas",
+            qualified=False,
             delegate=DummyTimeStamper(tsa_cert=tsa_cert, tsa_key=tsa_key),
         ),
         jurisdiction=get_profile("PY"),
@@ -213,6 +214,8 @@ def test_flujo_completo_persiste_evidencia_y_documentos(servicio, contexto, ento
     assert historial[0].status is SigningStatus.INITIALIZED
     assert historial[1].cryptographic_evidence is not None
     assert historial[1].consent_evidence is not None
+    # La evidencia declara que el sello es de prueba: no otorga fecha cierta.
+    assert historial[1].cryptographic_evidence.tsa_evidence.tsa_qualified is False
 
     # El expediente y el documento firmado quedan en la bóveda.
     assert boveda.objetos[BovedaEnMemoria.evidence_key(INQUILINO, sesion.signing_session_id)]
@@ -246,6 +249,56 @@ def test_expediente_de_evidencias_es_un_pdf_legible(servicio, contexto, entorno)
     assert "Expediente de Evidencias" in texto
     assert "PAdES-B-T" in texto
     assert "6822" in texto  # cita de la ley aplicable
+    # Con un sello de prueba, el expediente no puede afirmar fecha cierta.
+    assert "sin fecha cierta" in texto
+    assert "La fecha cierta proviene" not in texto
+
+
+@pytest.mark.parametrize(
+    ("cualificado", "presente", "ausente"),
+    [
+        (True, "La fecha cierta proviene", "sin fecha cierta"),
+        (False, "sin fecha cierta", "La fecha cierta proviene"),
+        # Un registro anterior al campo no se presume cualificado.
+        (None, "No registrado", "La fecha cierta proviene"),
+    ],
+)
+def test_el_expediente_declara_lo_que_la_evidencia_registro_del_sello(  # type: ignore[no-untyped-def]
+    servicio, contexto, entorno, cualificado, presente, ausente
+) -> None:
+    from pypdf import PdfReader
+
+    from pscnc.evidence.report import build_evidence_report
+
+    svc, repositorio, _ = servicio
+    sesion = svc.create_session(
+        context=contexto,
+        onboarding_token="onb-4",
+        pdf_document=_pdf("Contrato de servicios"),
+        filename="contrato.pdf",
+        environment=entorno,
+    )
+    svc.confirm(context=contexto, transaction_id=sesion.signing_session_id, payload=_confirmacion())
+    item = repositorio.versiones[sesion.signing_session_id][-1]
+    cripto = item.cryptographic_evidence
+    assert cripto is not None
+    item = item.model_copy(
+        update={
+            "cryptographic_evidence": cripto.model_copy(
+                update={
+                    "tsa_evidence": cripto.tsa_evidence.model_copy(
+                        update={"tsa_qualified": cualificado}
+                    )
+                }
+            )
+        }
+    )
+
+    lector = PdfReader(io.BytesIO(build_evidence_report(item)))
+    texto = "\n".join(pagina.extract_text() or "" for pagina in lector.pages)
+
+    assert presente in texto
+    assert ausente not in texto
 
 
 def test_bloquea_documento_legalmente_excluido(servicio, contexto, entorno) -> None:  # type: ignore[no-untyped-def]

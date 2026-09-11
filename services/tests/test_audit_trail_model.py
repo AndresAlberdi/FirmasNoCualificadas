@@ -93,6 +93,21 @@ def test_rechaza_hashes_identicos() -> None:
         )
 
 
+def test_un_sello_sin_condicion_registrada_no_se_presume_cualificado() -> None:
+    """Los registros anteriores al campo no lo traen: leerlos no puede inventarlo.
+
+    Si el valor por defecto fuera ``True``, cada expediente de desarrollo ya
+    guardado pasaría a afirmar una fecha cierta que ningún prestador otorgó.
+    """
+    sello = TsaEvidence(
+        tsa_provider_name="TSA de pruebas",
+        tsa_certificate_chain=["-----BEGIN CERTIFICATE-----"],
+        rfc3161_response_base64="AAAA",
+        timestamp_utc=datetime.now(UTC),
+    )
+    assert sello.tsa_qualified is None
+
+
 def test_rechaza_otp_verificado_antes_de_enviarse() -> None:
     ahora = datetime.now(UTC)
     with pytest.raises(ValidationError, match="antes de haberse enviado"):
