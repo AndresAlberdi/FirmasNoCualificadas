@@ -10,14 +10,14 @@ Usa el motor real (`PadesSigner`, `EphemeralCertificateAuthority`, `ConstanciaFi
 entorno **dev**: CA de desarrollo generada en el momento y TSA de pruebas local. Todo lo
 que produce va marcado como no válido, y **nada de esto es un artefacto oponible**.
 
-## Lo que el script compensa del motor (T-22 de `docs/PENDIENTES.md`)
+## Lo que el script compensa del motor (T-25 de `docs/PENDIENTES.md`)
 
 `FirmanteMarcado` y `CajaExacta` existen porque el bloque del motor, tal como está en
 `main`, sale ilegible (la declaración va en una sola línea y pyHanko escala todo el
-bloque), imprime «ƒ» en vez de «…» y no lleva la marca de entorno. Lo corrige la rama
-`fix/bloque-constancia-legible`; cuando se fusione, estas dos clases se retiran.
+bloque), imprime «ƒ» en vez de «…» y no lleva la marca de entorno. Lo corrige el PR #47
+(`fix/bloque-constancia-legible`); cuando se fusione, estas dos clases se retiran.
 
-## La hoja de firma (T-21)
+## La hoja de firma (T-24)
 
 `--hoja-de-firma` agrega una página final para las firmas, como actualización
 incremental. **No existe en el motor**: cambia qué documento se cierra y se hashea, y
@@ -179,7 +179,7 @@ class CaDeDesarrollo:
 
 
 class FirmanteMarcado(PadesSigner):
-    """Compensa tres defectos del bloque del motor en `main` (T-22).
+    """Compensa tres defectos del bloque del motor en `main` (T-25).
 
     1. La declaración sale en una sola línea de ~370 caracteres y pyHanko achica el
        bloque entero para que entre a lo ancho: se cortan las líneas y se fija el QR.
