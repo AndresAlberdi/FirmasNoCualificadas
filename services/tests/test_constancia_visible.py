@@ -62,6 +62,7 @@ def firmante(ca_certificate_der, ca_signer, tsa_material):  # type: ignore[no-un
         ca_signer=ca_signer,
         crl_url="https://crl.pruebas.example.py/pscnc/intermediate.crl",
         policy_oid="1.3.6.1.4.1.99999.1.1.1",
+        environment="prod",
     )
 
     def _fabrica() -> RecordingTimeStamper:
