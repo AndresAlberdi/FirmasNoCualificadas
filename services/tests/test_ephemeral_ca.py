@@ -35,6 +35,7 @@ def autoridad(ca_certificate_der, ca_signer):  # type: ignore[no-untyped-def]
         user_notice=AVISO,
         backdate_minutes=5,
         validity_minutes=15,
+        environment="prod",
     )
 
 
@@ -231,6 +232,7 @@ def test_sin_calificadores_configurados_no_se_inventan(  # type: ignore[no-untyp
         ca_signer=ca_signer,
         crl_url=CRL_URL,
         policy_oid=POLICY_OID,
+        environment="prod",
     )
 
     emitido = autoridad_minima.issue(sujeto)
@@ -277,4 +279,5 @@ def test_rechaza_un_certificado_que_no_sea_de_ca(ca_signer) -> None:  # type: ig
             ca_certificate_der=hoja.public_bytes(serialization.Encoding.DER),
             ca_signer=ca_signer,
             crl_url=CRL_URL,
+            environment="prod",
         )

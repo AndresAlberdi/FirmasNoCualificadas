@@ -143,7 +143,9 @@ class EphemeralCertificateAuthority:
         user_notice: str | None = None,
         backdate_minutes: int = 5,
         validity_minutes: int = 15,
-        environment: str = "prod",
+        # Sin valor por defecto a propósito: con `"prod"` implícito, un llamador que
+        # olvidara el parámetro emitía en dev certificados sin la marca de entorno.
+        environment: str,
     ) -> None:
         self._ca_cert = x509.Certificate.load(ca_certificate_der)
         self._ca_signer = ca_signer
