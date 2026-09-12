@@ -10,12 +10,11 @@ Usa el motor real (`PadesSigner`, `EphemeralCertificateAuthority`, `ConstanciaFi
 entorno **dev**: CA de desarrollo generada en el momento y TSA de pruebas local. Todo lo
 que produce va marcado como no válido, y **nada de esto es un artefacto oponible**.
 
-## Lo que el script compensa del motor (T-25 de `docs/PENDIENTES.md`)
+## El bloque lo arma el motor
 
-`FirmanteMarcado` y `CajaExacta` existen porque el bloque del motor, tal como está en
-`main`, sale ilegible (la declaración va en una sola línea y pyHanko escala todo el
-bloque), imprime «ƒ» en vez de «…» y no lleva la marca de entorno. Lo corrige el PR #47
-(`fix/bloque-constancia-legible`); cuando se fusione, estas dos clases se retiran.
+Desde el #47 el motor corta las líneas, fija el QR, abrevia la huella con «...» e imprime
+la marca de entorno. El script solo agrega una línea con el titular del certificado
+(`FirmanteConCertificado`), que el motor no imprime.
 
 ## La hoja de firma (T-24)
 
@@ -35,7 +34,7 @@ Para una verificación independiente de pyHanko: `pdfsig <archivo>` (poppler).
 
 Uso:
   services/.venv/bin/python scripts/firmar-prueba-alianza.py [entrada.pdf] --salida DIR \\
-      [--hoja-de-firma --ancho-linea 96] [--codigo PROP-00000000] [--url-base URL]
+      [--hoja-de-firma] [--codigo PROP-00000000] [--url-base URL]
 
 Sin `entrada.pdf` genera un PDF sintético.
 """
@@ -51,7 +50,6 @@ import secrets
 import sys
 import textwrap
 import uuid
-from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -68,21 +66,17 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric import utils as asym_utils  # noqa: E402
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID  # noqa: E402
 from jurisdictions import get_profile  # noqa: E402
-from pscnc.crypto.constancia import ConstanciaFirma  # noqa: E402
+from pscnc.crypto.constancia import ALTO_MINIMO, ANCHO_MINIMO, ConstanciaFirma  # noqa: E402
 from pscnc.crypto.ephemeral_ca import EphemeralCertificateAuthority, SubjectData  # noqa: E402
 from pscnc.crypto.pades import PadesSigner, VisualSignatureSpec  # noqa: E402
 from pscnc.crypto.tsa import RecordingTimeStamper  # noqa: E402
 
 ENTORNO = "dev"
-MARCA = "DOCUMENTO DE PRUEBA - NO VALIDO - ENTORNO DEV"
-#: Caracteres por línea del bloque; con Courier de 7 pt son ~270 pt de ancho.
-ANCHO_DE_LINEA = 64
-#: Lado del QR en puntos PDF (~3,2 cm): se escanea sin dificultad impreso.
-LADO_QR = 90
-#: Caja del bloque. Con este tamaño el contenido entra sin que pyHanko lo escale.
-ANCHO_BLOQUE, ALTO_BLOQUE = 420.0, 205.0
+#: Alto extra de la caja para la línea del certificado, que el motor no cuenta al
+#: calcular el alto que necesita el bloque.
+ALTO_LINEA_CERTIFICADO = 12
 #: Caja del bloque dentro de la hoja de firma (x, y, ancho, alto), en puntos PDF.
-CAJA_EN_HOJA = (36.0, 330.0, 540.0, 215.0)
+CAJA_EN_HOJA = (36.0, 330.0, 540.0, 225.0)
 #: Espacio reservado para la firma cualificada posterior (x, y, ancho, alto).
 RESERVA_CUALIFICADA = (36.0, 70.0, 540.0, 200.0)
 
@@ -178,57 +172,19 @@ class CaDeDesarrollo:
         )
 
 
-class FirmanteMarcado(PadesSigner):
-    """Compensa tres defectos del bloque del motor en `main` (T-25).
+class FirmanteConCertificado(PadesSigner):
+    """Agrega al bloque del motor una línea con el titular del certificado.
 
-    1. La declaración sale en una sola línea de ~370 caracteres y pyHanko achica el
-       bloque entero para que entre a lo ancho: se cortan las líneas y se fija el QR.
-    2. `_abreviar` elide la huella con «…» (U+2026), que la Courier estándar no
-       codifica y se imprime «ƒ»: se usan tres puntos.
-    3. El bloque no lleva la marca de entorno: se antepone.
-
-    Además agrega la línea del certificado con `%(signer)s`, que pyHanko completa al
-    firmar con el titular del certificado efímero —se emite dentro de `sign()` y no
-    existe antes—.
+    `%(signer)s` lo completa pyHanko al firmar con el titular del certificado efímero,
+    que se emite dentro de `sign()` y no existe antes. El resto del bloque —corte de
+    líneas, QR, marca de entorno— lo arma el motor.
     """
 
-    #: Se ajustan desde la línea de comandos según el espacio disponible.
-    ancho_linea: int = ANCHO_DE_LINEA
-    #: Sin renglones en blanco y con la marca en la línea del título: para huecos bajos.
-    compacto: bool = False
-
-    def _estilo_de_sello(self, visual: VisualSignatureSpec) -> Any:
-        estilo = super()._estilo_de_sello(visual)
-        if estilo is None:
-            return None
-        titulo, _, resto = estilo.stamp_text.partition("\n")
+    def _estilo_de_sello(self, bloque: str | None) -> Any:
+        if bloque is None:
+            return super()._estilo_de_sello(bloque)
         certificado = "Certificado: %(signer)s - emitido por CA de Desarrollo FNC [NO VALIDO]"
-        if self.compacto:
-            crudas = [f"{titulo} - {MARCA}", *(x for x in resto.split("\n") if x.strip())]
-        else:
-            crudas = [MARCA, titulo, *resto.split("\n")]
-        crudas.append(certificado)
-
-        lineas: list[str] = []
-        for linea in crudas:
-            cortadas = textwrap.wrap(
-                linea.replace("…", "..."), self.ancho_linea, subsequent_indent="  "
-            )
-            lineas.extend(cortadas or ([] if self.compacto else [""]))
-        return replace(estilo, stamp_text="\n".join(lineas), qr_inner_size=LADO_QR)
-
-
-@dataclass(frozen=True, slots=True)
-class CajaExacta(VisualSignatureSpec):
-    """Respeta la caja pedida en vez de agrandarla al mínimo del motor (300x190 pt).
-
-    El mínimo existe para que el bloque no se recorte; pyHanko no recorta sino que
-    escala, y con las líneas ya cortadas el escalado es mínimo. Agrandar la caja, en
-    cambio, la haría pisar el contenido del documento.
-    """
-
-    def con_espacio_para_la_constancia(self) -> VisualSignatureSpec:
-        return self
+        return super()._estilo_de_sello(f"{bloque}\n{certificado}")
 
 
 # ------------------------------------------------------------ Hoja de firma --
@@ -479,16 +435,12 @@ def main() -> int:
     ap.add_argument("--pagina", type=int, default=0, help="1-indexada; 0 = última")
     ap.add_argument("--x", type=float, default=40.0)
     ap.add_argument("--y", type=float, default=40.0)
-    ap.add_argument("--ancho", type=float, default=ANCHO_BLOQUE)
-    ap.add_argument("--alto", type=float, default=ALTO_BLOQUE)
-    ap.add_argument("--ancho-linea", type=int, default=ANCHO_DE_LINEA)
-    ap.add_argument("--compacto", action="store_true")
+    ap.add_argument("--ancho", type=float, default=float(ANCHO_MINIMO))
+    ap.add_argument("--alto", type=float, default=float(ALTO_MINIMO + ALTO_LINEA_CERTIFICADO))
     ap.add_argument(
         "--hoja-de-firma", action="store_true", help="agrega una página final para las firmas"
     )
     args = ap.parse_args()
-    FirmanteMarcado.ancho_linea = args.ancho_linea
-    FirmanteMarcado.compacto = args.compacto
 
     original = args.entrada.read_bytes() if args.entrada else pdf_sintetico()
     nombre = args.entrada.stem if args.entrada else "solicitud-prueba"
@@ -529,7 +481,7 @@ def main() -> int:
         user_notice=perfil.text("certificado.aviso_de_uso"),
         environment=ENTORNO,
     )
-    firmante = FirmanteMarcado(
+    firmante = FirmanteConCertificado(
         certificate_authority=autoridad,
         timestamper_factory=lambda: RecordingTimeStamper(
             "",
@@ -561,7 +513,7 @@ def main() -> int:
     resultado = firmante.sign(
         documento,
         SubjectData.for_jurisdiction(perfil, transaction_id=transaccion, **CLIENTE),
-        visual=CajaExacta(
+        visual=VisualSignatureSpec(
             enabled=True, page=pagina, x=x, y=y, width=ancho, height=alto, constancia=constancia
         ),
         field_name="FirmaNoCualificadaCliente",
