@@ -312,16 +312,19 @@ def build_timestamper_factory(
     *,
     url: str,
     provider_name: str,
+    qualified: bool,
     username: str = "",
     password: str = "",
     timeout: int = 10,
     max_retries: int = 3,
-    qualified: bool = True,
 ) -> Any:
     """Construye una fábrica de selladores: uno nuevo por transacción.
 
     Se crea uno por firma para que el token retenido corresponda inequívocamente
     a esa transacción y no pueda contaminarse entre peticiones concurrentes.
+
+    `qualified` es obligatorio: fuera de producción la autoridad es de pruebas, y
+    un valor por defecto `True` hacía que omitirlo declarara cualificado su sello.
     """
 
     def _factory() -> RecordingTimeStamper:

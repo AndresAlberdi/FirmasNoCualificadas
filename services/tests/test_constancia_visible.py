@@ -178,6 +178,7 @@ def fabrica_de_firmantes(ca_certificate_der, ca_signer, tsa_material):  # type: 
             return RecordingTimeStamper(
                 "",
                 provider_name="TSA de Pruebas",
+                qualified=False,
                 delegate=DummyTimeStamper(tsa_cert=tsa_cert, tsa_key=tsa_key),
             )
 

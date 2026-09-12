@@ -564,8 +564,10 @@ class TransactionService:
             timestamp_authority=(
                 firma_pades.timestamp.provider_name if firma_pades is not None else ""
             ),
+            # Sin firma PAdES no hay sello y el campo no se emite; aun así se
+            # declara `False` y no `True`: sin sello no hay fecha cierta.
             timestamp_qualified=(
-                firma_pades.timestamp.qualified if firma_pades is not None else True
+                firma_pades.timestamp.qualified if firma_pades is not None else False
             ),
         )
         return self._sellador.seal(acta, sealed_at=ahora)
