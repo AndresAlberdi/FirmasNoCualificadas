@@ -55,7 +55,41 @@ quien la ejecuta sin cambios. Lo que faltaba —y este documento cierra— era *
 prefijo como variable y dejar escritas las tres comprobaciones de arriba**, porque una
 propiedad que nadie enunció es una propiedad que el próximo cambio rompe sin que nadie lo note.
 
-## 5. Lo que este documento **no** resuelve
+## 5. El entorno se declara, y se comprueba
+
+Fuera de producción, todo artefacto del motor va marcado. El certificado lleva
+`[NO VALIDO - ENTORNO {ENV}]` en la unidad organizativa; el acta declara `environment` y
+`not_valid_for_production`; el sello de una autoridad de pruebas figura como
+`timestamp.qualified: false`. Un artefacto de pruebas que parece real es peor que uno que falta,
+porque alguien lo termina presentando como válido.
+
+Todas esas marcas salen de **una sola variable**: `PSCNC_ENVIRONMENT`, con los valores
+`sandbox`, `dev`, `staging` o `prod`. Si no se declara, vale `dev`. El módulo de Terraform
+`signer-service` la fija desde `var.environment`.
+
+Dos comprobaciones antes de dar por bueno un despliegue:
+
+1. **`PSCNC_ENVIRONMENT` coincide con el entorno real.** Un staging declarado `prod` emite
+   artefactos sin marca, indistinguibles de los de producción.
+2. **Firmar un documento de prueba en ese entorno y mirar el certificado.** Fuera de `prod`, la
+   OU empieza con la marca; en `prod`, no la lleva.
+
+### Estado en `main` al 2026-09-11: la comprobación 2 puede fallar fuera de producción
+
+Hay caminos que todavía **no heredan el entorno**. Están corregidos en PR abiertos, y hasta que
+se fusionen el flujo heredado no marca lo que produce:
+
+| Qué falla hoy | Consecuencia | Lo corrige |
+| :-- | :-- | :-- |
+| `build_signing_service` construye la CA sin el entorno, y el constructor asume `"prod"` | Los certificados del flujo heredado (`/v1/signing-sessions/*`) salen sin marca | #48 (o su duplicado, #46) |
+| `acta.py` y `transacciones.py` asumen `"prod"` si el llamador no pasa el entorno | Un llamador que lo olvide produce actas sin marca. El flujo v1 sí lo pasa | #52 |
+| `build_signing_service` no le dice a la TSA si es de pruebas, y el valor por defecto es «cualificada» | La evidencia del flujo heredado declara cualificado un sello de prueba | Rama `fix/qualified-flujo-legado`, todavía sin PR |
+| El bloque visible de constancia no lleva la marca | Todavía no se imprime desde ningún flujo (T-19); cuando se imprima, tiene que llevarla | #47 |
+
+`docs/produccion/orden-de-fusion-2026-09-11.md` lleva el orden en que conviene fusionarlos.
+Cuando estén todos fusionados, esta subsección se reduce a las dos comprobaciones de arriba.
+
+## 6. Lo que este documento **no** resuelve
 
 **Hasta dónde puede llegar el soporte sin que FNC pase a prestar el servicio.** Alojar la
 infraestructura casi con seguridad cruza la línea; operar las claves en nombre del cliente
