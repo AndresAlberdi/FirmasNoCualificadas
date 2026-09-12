@@ -117,6 +117,9 @@ def build_signing_service() -> SigningService:
             password=settings.tsa_password,
             timeout=settings.tsa_timeout_seconds,
             max_retries=settings.tsa_max_retries,
+            # Igual que en `build_pades_signer`: fuera de producción la autoridad
+            # es de pruebas, y su sello no otorga fecha cierta.
+            qualified=settings.is_production,
         ),
         jurisdiction=require_profile(settings.jurisdiction, environment=settings.environment),
     )

@@ -261,6 +261,7 @@ class SigningService:
                 rfc3161_response_base64=resultado.timestamp.token_base64,
                 timestamp_utc=resultado.timestamp.gen_time,
                 tsa_serial_number=resultado.timestamp.serial_number,
+                tsa_qualified=resultado.timestamp.qualified,
             ),
         )
 

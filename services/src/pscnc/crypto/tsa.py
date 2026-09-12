@@ -133,6 +133,11 @@ class RecordingTimeStamper(TimeStamper):
         self._qualified = qualified
         self._last_token: cms.ContentInfo | None = None
 
+    @property
+    def qualified(self) -> bool:
+        """Si el sello que obtiene este sellador otorga fecha cierta."""
+        return self._qualified
+
     # pyHanko invoca este método durante el firmado.
     async def async_timestamp(self, message_digest: bytes, md_algorithm: str) -> cms.ContentInfo:
         ultimo_error: Exception | None = None
