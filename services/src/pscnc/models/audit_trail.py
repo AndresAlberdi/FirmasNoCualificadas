@@ -137,13 +137,22 @@ class ConsentEvidence(_Base):
 
 # --------------------------------------------------------------- Criptografía
 class TsaEvidence(_Base):
-    """Sello de tiempo cualificado que otorga fecha cierta (RFC 3161)."""
+    """Sello de tiempo RFC 3161 del documento firmado.
+
+    Otorga fecha cierta solo si lo emite un prestador cualificado, y
+    `tsa_qualified` registra cuál es el caso.
+    """
 
     tsa_provider_name: str = Field(min_length=1)
     tsa_certificate_chain: list[str] = Field(min_length=1)
     rfc3161_response_base64: str = Field(min_length=1)
     timestamp_utc: datetime
     tsa_serial_number: str | None = None
+    #: ``False`` cuando el sello proviene de una autoridad de pruebas: acredita que
+    #: el sistema funciona, no la fecha cierta del acto. ``None`` en los registros
+    #: anteriores a que la evidencia lo declarara: no se presume cualificado lo que
+    #: nadie registró como tal.
+    tsa_qualified: bool | None = None
 
 
 class CryptographicEvidence(_Base):
