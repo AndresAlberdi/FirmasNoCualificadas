@@ -13,6 +13,17 @@ timeout: 10m
 
 # Severidades reportadas por defecto (los workflows bloquean en CRITICAL,HIGH;
 # MEDIUM se reporta en el informe para planificar su corrección)
+#
+# Se conserva a propósito, aunque la plantilla del estándar la quitó. Su motivo
+# —que este valor anula el `bloquear_en` del workflow— no se cumple, y se
+# comprobó con Trivy 0.70.0 (la versión que instala trivy-action v0.36.0):
+#   - `--severity` y `TRIVY_SEVERITY` tienen prioridad sobre este archivo.
+#   - trivy-action exporta `TRIVY_SEVERITY` con el input `severity`, y solo lo
+#     borra en SARIF cuando falta `limit-severities-for-sarif: true`.
+# En ese último caso es cuando este valor pesa, y quitarlo empeora las cosas:
+# sin él, Trivy bloquea por cualquier hallazgo, LOW incluido. Lo que evita el
+# bloqueo por MEDIUM es `limit-severities-for-sarif`, que los pasos de Trivy
+# con salida SARIF ya fijan en `_reusable-security.yml`.
 severity:
   - CRITICAL
   - HIGH
@@ -54,22 +65,28 @@ vulnerability:
   # No bloquear por CVEs sin parche disponible: no hay acción posible salvo
   # cambiar la imagen base. Se registran en el informe.
   ignore-unfixed: true
-  # Tipos: os (paquetes del SO de la imagen) y library (dependencias de la app)
-  type:
+
+pkg:
+  # Tipos: os (paquetes del SO de la imagen) y library (dependencias de la app).
+  # Antes era `vulnerability.type`, que Trivy 0.70 declara obsoleto.
+  types:
     - os
     - library
 
 misconfiguration:
-  # Analiza también .tf.json, Dockerfile, Kubernetes, Helm y Compose
   include-non-failures: false
-  # Revisa las políticas embebidas de Trivy (Docker CIS, Terraform, K8s)
+  # Revisa las políticas embebidas de Trivy (Docker CIS, Terraform, K8s).
+  #
+  # Solo nombres que Trivy acepta. La lista tenía `dockercompose` y
+  # `github-actions`, que no son escáneres de Trivy 0.70: ante un nombre inválido
+  # Trivy registra un ERROR y DESCARTA LA LISTA ENTERA en favor de la suya por
+  # defecto, de modo que esta sección no controlaba nada. Los workflows los
+  # revisa checkov (reglas CKV_GHA_*); Compose no se usa en este repositorio.
   scanners:
     - terraform
     - dockerfile
     - kubernetes
     - helm
-    - dockercompose
-    - github-actions
 
 secret:
   # Gitleaks es el escáner principal de secretos; Trivy actúa como red de
