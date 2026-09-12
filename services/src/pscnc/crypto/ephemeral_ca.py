@@ -138,12 +138,15 @@ class EphemeralCertificateAuthority:
         ca_certificate_der: bytes,
         ca_signer: CaSigner,
         crl_url: str,
+        # Sin valor por defecto a propósito: con `prod` implícito, un llamador que
+        # olvidara pasarlo emitía en dev y staging certificados sin la marca de
+        # entorno, indistinguibles de uno real. El olvido tiene que ser un error.
+        environment: str,
         policy_oid: str | None = None,
         cps_url: str | None = None,
         user_notice: str | None = None,
         backdate_minutes: int = 5,
         validity_minutes: int = 15,
-        environment: str = "prod",
     ) -> None:
         self._ca_cert = x509.Certificate.load(ca_certificate_der)
         self._ca_signer = ca_signer
