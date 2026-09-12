@@ -1,6 +1,6 @@
 # =============================================================================
 # dependabot.yml — Actualización automática de dependencias y de pines por SHA
-# Versión: 2.1 | Revisado: 2026-09-05
+# Versión: 2.2 | Revisado: 2026-09-12
 # -----------------------------------------------------------------------------
 # CORREGIDO (2026-09-05). La versión anterior venía de la plantilla del estándar
 # y tenía dos problemas que se anulaban entre sí:
@@ -33,6 +33,18 @@
 # la propondría. `semver-*-days` solo vale en ecosistemas que versionan con
 # semver: pasárselo a github-actions, docker o terraform hace que Dependabot
 # rechace el archivo entero.
+#
+# ALINEADO CON EL ESTÁNDAR (2026-09-12). Las versiones mayores de npm y uv
+# quedan fuera de la automatización, como fija la política del estándar
+# (SeguridadGeneral, 01-seguridad/04 §7.2): se revisan una vez al mes, a mano,
+# con notas de cambio. Las de github-actions, docker y terraform siguen
+# llegando en PR individuales. También se separan en npm los grupos de
+# producción y de desarrollo, y se agrupan los menores de terraform.
+#
+# OJO: la exclusión (`ignore`) también frena las actualizaciones de SEGURIDAD
+# que exijan una versión mayor. La alerta sigue apareciendo en Dependabot
+# alerts, pero el PR no se abre solo: se abre a mano, dentro de las 72 h que
+# la política fija para los parches HIGH/CRITICAL.
 # =============================================================================
 version: 2
 
@@ -75,8 +87,16 @@ updates:
       prefix-development: "chore(deps-dev)"
     versioning-strategy: increase
     groups:
-      dashboard-minor-patch:
+      dashboard-produccion-minor-patch:
+        dependency-type: production
         update-types: [minor, patch]
+      dashboard-desarrollo:
+        dependency-type: development
+        update-types: [minor, patch]
+    # Mayores: revisión mensual manual (ver encabezado).
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # ---- npm — SDK de TypeScript ------------------------------------------------
   - package-ecosystem: npm
@@ -98,8 +118,16 @@ updates:
       prefix-development: "chore(deps-dev)"
     versioning-strategy: increase
     groups:
-      sdk-minor-patch:
+      sdk-produccion-minor-patch:
+        dependency-type: production
         update-types: [minor, patch]
+      sdk-desarrollo:
+        dependency-type: development
+        update-types: [minor, patch]
+    # Mayores: revisión mensual manual (ver encabezado).
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # ---- uv — servicios de Python -----------------------------------------------
   # `uv`, no `pip`: /services trae pyproject.toml y uv.lock. Es el ecosistema
@@ -124,6 +152,10 @@ updates:
     groups:
       services-minor-patch:
         update-types: [minor, patch]
+    # Mayores: revisión mensual manual (ver encabezado).
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # ---- Docker — imagen base de los servicios ----------------------------------
   - package-ecosystem: docker
@@ -135,7 +167,7 @@ updates:
       timezone: America/La_Paz
     cooldown:
       default-days: 7
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     labels: [dependencias, docker, seguridad]
     commit-message:
       prefix: "chore(docker)"
@@ -150,7 +182,10 @@ updates:
       timezone: America/La_Paz
     cooldown:
       default-days: 7
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     labels: [dependencias, terraform, infra]
     commit-message:
       prefix: "chore(infra)"
+    groups:
+      terraform-minor-patch:
+        update-types: [minor, patch]
