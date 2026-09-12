@@ -2,7 +2,7 @@
 # ==============================================================================
 # security-local.sh — Equivalente local de _reusable-security.yml
 # ==============================================================================
-# Versión: 2.0 | Fecha: 2026-08-24
+# Versión: 2.1 | Fecha: 2026-09-11
 # Documentos relacionados: 00-gobernanza/01-politica-cicd-devsecops.md (secciones 3.1, 6 y 8),
 #   02-pipelines/workflows/_reusable-security.yml, 02-pipelines/config/{gitleaks.toml,semgrep.yml,trivy.yaml}
 #
@@ -12,9 +12,15 @@
 #
 # Ejecuta con herramientas OSS los mismos controles de la fase
 # `seguridad-estatica` del pipeline: secretos (gitleaks), SAST (semgrep),
-# SCA (osv-scanner, npm audit, pip-audit), IaC y Dockerfile (trivy, checkov).
+# SCA (osv-scanner, npm/pnpm audit, pip-audit), IaC y Dockerfile (trivy, checkov).
 # Usa los mismos archivos de configuración que CI (.github/gitleaks.toml,
 # .github/semgrep.yml, .github/trivy.yaml) si existen, para que "en mi máquina pasaba" no ocurra.
+#
+# Monorepos: los escáneres de composición analizan la raíz Y cada
+# `componentes[].ruta` del manifiesto, que es donde viven los lockfiles
+# (services/uv.lock, dashboard/pnpm-lock.yaml). Un escáner que no encontró
+# fuentes, o que falló, figura en el resumen como NO EJECUTADO y el resultado
+# se marca como de cobertura parcial: un análisis vacío no es un análisis limpio.
 #
 # Excepciones (D5): igual que el job `preparar` de _reusable-security.yml, este
 # script lee `seguridad.excepciones[]` de .devsecops.yml, descarta las vencidas
@@ -34,7 +40,7 @@
 # ==============================================================================
 set -Eeuo pipefail
 
-readonly SCRIPT_VERSION="2.0"
+readonly SCRIPT_VERSION="2.1"
 readonly MANIFIESTO=".devsecops.yml"
 readonly INFORMES_BASE_DEFECTO=".security-reports"
 # Versiones fijadas para --instalar (mismas que usa el pipeline; actualícelas
@@ -44,6 +50,9 @@ readonly TRIVY_VERSION="0.70.0"
 readonly OSV_SCANNER_VERSION="2.5.1"
 readonly SEMGREP_VERSION="1.174.0"
 readonly CHECKOV_VERSION="3.3.13"
+readonly PIP_AUDIT_VERSION="2.10.1"   # la misma que instala _reusable-security.yml
+# Manifiestos de dependencias que se entregan a osv-scanner con -L.
+readonly LOCKFILES=(package-lock.json pnpm-lock.yaml yarn.lock uv.lock poetry.lock Pipfile.lock pdm.lock requirements.txt)
 readonly BIN_DIR="${HOME}/.local/bin"
 
 UMBRAL="HIGH"
@@ -55,7 +64,15 @@ INFORMES_BASE="$INFORMES_BASE_DEFECTO"
 INFORME_DIR=""
 declare -a FALTANTES=()
 declare -a EJECUTADAS=()
-STACK_NODE=0; STACK_PYTHON=0; STACK_DOCKER=0; STACK_IAC=0
+STACK_DOCKER=0; STACK_IAC=0
+# Directorios analizados (raíz + componentes del manifiesto) y, entre ellos,
+# los que tienen dependencias de cada ecosistema.
+declare -a DIRECTORIOS=() DIRS_NODE=() DIRS_PYTHON=()
+# Registros en el directorio de informe (se crean en main):
+#   fuentes.tsv        herramienta, ruta, lockfile y JSON de cada fuente analizada
+#   no-ejecutadas.tsv  herramienta, ruta y motivo de cada escáner que no analizó nada
+FUENTES_TSV=""
+NO_EJECUTADAS_TSV=""
 # Excepciones vigentes generadas desde el manifiesto (mismos artefactos que el
 # job `preparar` de _reusable-security.yml).
 CHECKOV_SKIP=""      # IDs CKV_* separados por comas (checkov --skip-check)
@@ -93,7 +110,8 @@ Opciones:
   --ruta <DIR>                Directorio a analizar (por defecto el actual).
   --solo <lista>              Ejecuta solo estas herramientas, separadas por coma:
                               gitleaks,semgrep,osv-scanner,trivy,checkov,npm-audit,pip-audit
-  --sin-historial             gitleaks analiza solo el árbol de trabajo (no el historial git).
+                              (npm-audit usa npm o pnpm según el lockfile de cada componente).
+  --sin-historial            gitleaks analiza solo el árbol de trabajo (no el historial git).
   --informe <DIR>             Directorio base de informes (por defecto ${INFORMES_BASE_DEFECTO}/).
   -h, --help                  Muestra esta ayuda.
 
@@ -103,6 +121,10 @@ Excepciones: la única fuente es ${MANIFIESTO} (seguridad.excepciones[]: id,
   ignorado de checkov/semgrep/pip-audit (los mismos artefactos que el job
   'preparar' de _reusable-security.yml); esos archivos no se versionan ni se
   editan a mano (política, sección 8).
+
+Composición (SCA): se analizan la raíz y cada componentes[].ruta de
+  ${MANIFIESTO}. Un escáner sin fuentes o que falla figura como NO EJECUTADO y
+  el resultado se informa como de cobertura parcial; nunca como aprobado.
 
 Códigos de salida: 0 limpio | 1 hallazgos ≥ umbral | 2 uso | 3 error de ejecución
 EOF
@@ -139,16 +161,88 @@ herramienta_activa() {
 # ------------------------------------------------------------------------------
 # Detección de stack (mismos criterios que la fase preparar del pipeline)
 # ------------------------------------------------------------------------------
+# slug <ruta>: nombre de archivo estable para los informes de un componente.
+slug() {
+  local s="${1#./}"
+  [[ -z "$s" || "$s" == "." ]] && s="raiz"
+  printf '%s' "${s//\//-}"
+}
+
+# no_ejecutada <herramienta> <ruta> <motivo>: el escáner no analizó nada en esa
+# ruta. Queda en el resumen como no ejecutado; nunca como aprobado.
+no_ejecutada() {
+  herramienta_activa "$1" || return 0
+  printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$NO_EJECUTADAS_TSV"
+  log_warn "$1 NO EJECUTADO en $2: $3"
+}
+
+# registrar_fuente <herramienta> <ruta> <lockfile> <json>: evidencia de qué
+# analizó cada escáner de composición (sección "Fuentes" del resumen).
+registrar_fuente() {
+  printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$(basename "$4")" >> "$FUENTES_TSV"
+}
+
+# listar_directorios: la raíz y cada componentes[].ruta del manifiesto, con su
+# stack declarado ("ruta<TAB>stack"). Mismo criterio que el pipeline, que
+# ejecuta _reusable-security.yml una vez por componente.
+listar_directorios() {
+  printf '.\t\n'
+  [[ -f "$MANIFIESTO" ]] || return 0
+  command -v python3 >/dev/null 2>&1 || { log_warn "python3 no disponible: no se leen los componentes de $MANIFIESTO; se analiza solo la raíz"; return 0; }
+  python3 - "$MANIFIESTO" <<'PY' || log_warn "No se pudieron leer los componentes de $MANIFIESTO; se analiza solo la raíz"
+import os, sys
+try:
+    import yaml
+except ImportError:
+    print("[AVISO] PyYAML no instalado: no se leen los componentes del manifiesto; se analiza solo la raíz", file=sys.stderr)
+    sys.exit(0)
+with open(sys.argv[1], encoding="utf-8") as f:
+    m = yaml.safe_load(f) or {}
+for c in m.get("componentes") or []:
+    c = c or {}
+    ruta = os.path.normpath(str(c.get("ruta") or "."))
+    if os.path.isabs(ruta) or ruta == ".." or ruta.startswith("../"):
+        print(f"[AVISO] Componente {c.get('nombre')}: ruta fuera del repositorio, se ignora ({ruta})", file=sys.stderr)
+        continue
+    if not os.path.isdir(ruta):
+        print(f"[AVISO] Componente {c.get('nombre')}: la ruta {ruta} no existe", file=sys.stderr)
+        continue
+    print(f"{ruta}\t{c.get('stack') or ''}")
+PY
+}
+
 detectar_stack() {
-  log_seccion "Detección de stack en $(cd "$RUTA" && pwd)"
-  [[ -f package.json ]] && STACK_NODE=1
-  [[ -f requirements.txt || -f pyproject.toml ]] && STACK_PYTHON=1
-  compgen -G "Dockerfile*" >/dev/null && STACK_DOCKER=1
-  if compgen -G "*.tf" >/dev/null || compgen -G "**/*.tf" >/dev/null 2>&1 \
-     || [[ -d k8s || -d kubernetes || -d terraform || -d infra ]] || compgen -G "*.yaml" >/dev/null; then
+  log_seccion "Detección de stack en $(pwd)"
+  local ruta stack
+  local -A vistos=()
+  while IFS=$'\t' read -r ruta stack; do
+    [[ -n "$ruta" ]] || continue
+    if [[ -z "${vistos[$ruta]:-}" ]]; then
+      vistos[$ruta]=1
+      DIRECTORIOS+=("$ruta")
+      [[ -f "$ruta/package.json" ]] && DIRS_NODE+=("$ruta")
+      if [[ -f "$ruta/pyproject.toml" || -f "$ruta/requirements.txt" || -f "$ruta/uv.lock" ]]; then
+        DIRS_PYTHON+=("$ruta")
+      fi
+      compgen -G "$ruta/Dockerfile*" >/dev/null && STACK_DOCKER=1
+      compgen -G "$ruta/*.tf" >/dev/null && STACK_IAC=1
+    fi
+    # Un componente que declara un stack y no tiene nada que auditar no es un
+    # componente limpio: es uno que no se analizó.
+    case "$stack" in
+      node)   [[ -f "$ruta/package.json" ]] \
+                || no_ejecutada npm-audit "$ruta" "el componente declara stack node y no tiene package.json" ;;
+      python) [[ -f "$ruta/pyproject.toml" || -f "$ruta/requirements.txt" ]] \
+                || no_ejecutada pip-audit "$ruta" "el componente declara stack python y no tiene pyproject.toml ni requirements.txt" ;;
+      terraform) STACK_IAC=1 ;;
+    esac
+  done < <(listar_directorios)
+  if compgen -G "*.tf" >/dev/null || [[ -d k8s || -d kubernetes || -d terraform || -d infra ]] \
+     || compgen -G "*.yaml" >/dev/null; then
     STACK_IAC=1
   fi
-  log_info "node=$STACK_NODE python=$STACK_PYTHON docker=$STACK_DOCKER iac=$STACK_IAC"
+  log_info "directorios: ${DIRECTORIOS[*]}"
+  log_info "node: ${DIRS_NODE[*]:-—} | python: ${DIRS_PYTHON[*]:-—} | docker=$STACK_DOCKER iac=$STACK_IAC"
 }
 
 # ------------------------------------------------------------------------------
@@ -249,8 +343,10 @@ comando_instalacion() {
     osv-scanner) echo "./security-local.sh --instalar  (binario v${OSV_SCANNER_VERSION} de github.com/google/osv-scanner/releases)" ;;
     semgrep)     echo "python3 -m pip install --user 'semgrep==${SEMGREP_VERSION}'" ;;
     checkov)     echo "python3 -m pip install --user 'checkov==${CHECKOV_VERSION}'" ;;
-    pip-audit)   echo "python3 -m pip install --user pip-audit" ;;
+    pip-audit)   echo "uv tool install 'pip-audit==${PIP_AUDIT_VERSION}'  (o python3 -m pip install --user 'pip-audit==${PIP_AUDIT_VERSION}')" ;;
     npm)         echo "instale Node.js 22 LTS (incluye npm): https://nodejs.org" ;;
+    pnpm)        echo "corepack enable pnpm  (Node.js 22 LTS incluye Corepack)" ;;
+    uv)          echo "instale uv: https://docs.astral.sh/uv/getting-started/installation/" ;;
     *) echo "consulte la documentación de $herramienta" ;;
   esac
 }
@@ -289,7 +385,15 @@ instalar_herramienta() {
       descargar_binario "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_${so}_${a}" osv-scanner || rc=1 ;;
     semgrep)   python3 -m pip install --quiet --user "semgrep==${SEMGREP_VERSION}" || rc=1 ;;
     checkov)   python3 -m pip install --quiet --user "checkov==${CHECKOV_VERSION}" || rc=1 ;;
-    pip-audit) python3 -m pip install --quiet --user pip-audit || rc=1 ;;
+    pip-audit)
+      # Con uv se instala aislado en ${BIN_DIR}; pip --user falla en los
+      # sistemas con Python gestionado por el SO (PEP 668).
+      if command -v uv >/dev/null 2>&1; then
+        uv tool install --quiet "pip-audit==${PIP_AUDIT_VERSION}" || rc=1
+      else
+        python3 -m pip install --quiet --user "pip-audit==${PIP_AUDIT_VERSION}" || rc=1
+      fi
+      case ":$PATH:" in *":${BIN_DIR}:"*) ;; *) export PATH="${BIN_DIR}:${PATH}" ;; esac ;;
     *)
       log_warn "No hay instalación automática para $herramienta: $(comando_instalacion "$herramienta")"
       return 1 ;;
@@ -309,24 +413,48 @@ disponible() {
   if [[ "$INSTALAR" -eq 1 ]] && instalar_herramienta "$herramienta"; then
     return 0
   fi
-  FALTANTES+=("$herramienta")
+  [[ " ${FALTANTES[*]:-} " == *" $herramienta "* ]] || FALTANTES+=("$herramienta")
   return 1
 }
 
 # ------------------------------------------------------------------------------
 # Ejecución de cada herramienta (siempre con salida JSON al directorio de informe)
 # ------------------------------------------------------------------------------
-# registrar_ejecucion <herramienta> <json>: una herramienta cuenta como ejecutada
-# solo si produjo su archivo de resultados; si no (sin red, error de reglas), se
-# avisa y no se da por cubierta.
+# registrar_ejecucion <herramienta> <json> [ruta]: una herramienta cuenta como
+# ejecutada solo si produjo su archivo de resultados; si no (sin red, error de
+# reglas, registro caído) queda como NO ejecutada en esa ruta. Siempre devuelve
+# 0: bajo `set -e` un escáner fallido no debe cortar los siguientes.
 registrar_ejecucion() {
-  local herramienta="$1" archivo="$2"
+  local herramienta="$1" archivo="$2" ruta="${3:-.}"
   if [[ -s "$archivo" ]]; then
-    EJECUTADAS+=("$herramienta")
-    log_ok "$herramienta completado"
+    [[ " ${EJECUTADAS[*]:-} " == *" $herramienta "* ]] || EJECUTADAS+=("$herramienta")
+    log_ok "$herramienta completado${3:+ ($ruta)}"
   else
-    log_warn "$herramienta no produjo resultados; revise ${archivo%.json}.log (¿sin red para descargar reglas/BD?)"
+    no_ejecutada "$herramienta" "$ruta" "no produjo resultados; revise $(basename "${archivo%.json}").log (¿sin red para descargar reglas/BD?)"
   fi
+  return 0
+}
+
+# validar_json <archivo> <clave>...: conserva el informe solo si es un objeto
+# JSON con alguna de las claves esperadas. Un `{"error": ...}` del registro no
+# es un resultado: se renombra a .invalido para que no cuente como ejecución.
+validar_json() {
+  local archivo="$1"; shift
+  [[ -s "$archivo" ]] || return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+  if ! python3 - "$archivo" "$@" 2>/dev/null <<'PY'
+import json, sys
+try:
+    with open(sys.argv[1], encoding="utf-8") as f:
+        d = json.load(f)
+except Exception:
+    sys.exit(1)
+sys.exit(0 if isinstance(d, dict) and any(k in d for k in sys.argv[2:]) else 1)
+PY
+  then
+    mv "$archivo" "${archivo}.invalido"
+  fi
+  return 0
 }
 
 correr_gitleaks() {
@@ -363,8 +491,31 @@ correr_osv() {
   herramienta_activa osv-scanner || return 0
   log_seccion "osv-scanner (SCA multi-ecosistema)"
   disponible osv-scanner || { log_warn "osv-scanner no disponible: $(comando_instalacion osv-scanner)"; return 0; }
-  osv-scanner scan --recursive --format json --output "$INFORME_DIR/osv.json" . >"$INFORME_DIR/osv.log" 2>&1 || true
-  registrar_ejecucion osv-scanner "$INFORME_DIR/osv.json"
+  # Lockfiles explícitos (-L) de la raíz y de cada componente, en lugar de
+  # `--recursive .`: el recorrido recursivo respeta .gitignore y, dentro de un
+  # worktree anidado en un directorio que el repositorio padre ignora (p. ej.
+  # .claude/worktrees/), descarta el árbol entero y termina en "No package
+  # sources found" sin analizar nada.
+  local -a args=() fuentes=()
+  local d f
+  for d in "${DIRECTORIOS[@]}"; do
+    for f in "${LOCKFILES[@]}"; do
+      if [[ -f "$d/$f" ]]; then
+        args+=(-L "$d/$f"); fuentes+=("$d/$f")
+      fi
+    done
+  done
+  if [[ ${#fuentes[@]} -eq 0 ]]; then
+    no_ejecutada osv-scanner "." "sin lockfiles en la raíz ni en los componentes (${LOCKFILES[*]})"
+    return 0
+  fi
+  local json="$INFORME_DIR/osv.json"
+  osv-scanner scan source "${args[@]}" --format json --output-file "$json" >"$INFORME_DIR/osv.log" 2>&1 || true
+  validar_json "$json" results
+  registrar_ejecucion osv-scanner "$json"
+  if [[ -s "$json" ]]; then
+    for f in "${fuentes[@]}"; do registrar_fuente osv-scanner "$(dirname "$f")" "$f" "$json"; done
+  fi
 }
 
 correr_trivy() {
@@ -397,35 +548,78 @@ correr_checkov() {
   registrar_ejecucion checkov "$INFORME_DIR/checkov.json"
 }
 
+# Auditoría nativa del ecosistema node, por componente: npm audit sobre
+# package-lock.json o pnpm audit sobre pnpm-lock.yaml. Ambas leen el lockfile y
+# consultan el registro: no instalan nada ni ejecutan scripts de ciclo de vida.
+# Nunca se sugiere `npm install` para fabricar un lockfile que falta.
 correr_npm_audit() {
   herramienta_activa npm-audit || return 0
-  [[ "$STACK_NODE" -eq 1 ]] || return 0
-  log_seccion "npm audit (SCA node)"
-  disponible npm || { log_warn "npm no disponible: $(comando_instalacion npm)"; return 0; }
-  [[ -f package-lock.json ]] || { log_warn "Sin package-lock.json: npm audit requiere lockfile (ejecute npm install)"; return 0; }
-  npm audit --json --audit-level=none >"$INFORME_DIR/npm-audit.json" 2>"$INFORME_DIR/npm-audit.log" || true
-  registrar_ejecucion npm-audit "$INFORME_DIR/npm-audit.json"
+  [[ ${#DIRS_NODE[@]} -gt 0 ]] || return 0
+  log_seccion "npm audit / pnpm audit (SCA node, por componente)"
+  local d json fuente
+  for d in "${DIRS_NODE[@]}"; do
+    json="$INFORME_DIR/npm-audit-$(slug "$d").json"
+    if [[ -f "$d/package-lock.json" ]]; then
+      disponible npm || { log_warn "npm no disponible: $(comando_instalacion npm)"; continue; }
+      fuente="$d/package-lock.json"
+      (cd "$d" && npm audit --json --audit-level=none) >"$json" 2>"${json%.json}.log" || true
+    elif [[ -f "$d/pnpm-lock.yaml" ]]; then
+      disponible pnpm || { log_warn "pnpm no disponible: $(comando_instalacion pnpm)"; continue; }
+      fuente="$d/pnpm-lock.yaml"
+      # Dentro del componente y no con --dir: Corepack elige la versión de pnpm
+      # por el `packageManager` del package.json del directorio actual. Desde la
+      # raíz arrancaría la global y pnpm abortaría por versión distinta.
+      (cd "$d" && pnpm audit --json) >"$json" 2>"${json%.json}.log" || true
+    else
+      no_ejecutada npm-audit "$d" "package.json sin package-lock.json ni pnpm-lock.yaml (yarn y bun no se auditan localmente)"
+      continue
+    fi
+    # npm >= 7 publica "vulnerabilities"; pnpm y npm 6, "advisories".
+    validar_json "$json" vulnerabilities advisories
+    registrar_ejecucion npm-audit "$json" "$d"
+    if [[ -s "$json" ]]; then registrar_fuente npm-audit "$d" "$fuente" "$json"; fi
+  done
 }
 
+# pip-audit por componente. Con uv.lock se exporta el árbol fijado (con hashes,
+# sin volver a resolver) y pip-audit lo audita sin invocar pip; con
+# requirements.txt se audita ese archivo; con solo pyproject.toml, el proyecto
+# (pip-audit resuelve sus dependencias, como el `pip install .` del pipeline).
 correr_pip_audit() {
   herramienta_activa pip-audit || return 0
-  [[ "$STACK_PYTHON" -eq 1 ]] || return 0
-  log_seccion "pip-audit (SCA python)"
+  [[ ${#DIRS_PYTHON[@]} -gt 0 ]] || return 0
+  log_seccion "pip-audit (SCA python, por componente)"
   disponible pip-audit || { log_warn "pip-audit no disponible: $(comando_instalacion pip-audit)"; return 0; }
-  local -a args=(-f json -o "$INFORME_DIR/pip-audit.json" --progress-spinner off)
   # Excepciones vigentes del manifiesto: "--ignore-vuln ID ..."
-  if [[ -n "$PIP_IGNORE" ]]; then
-    local -a ign=()
-    read -r -a ign <<< "$PIP_IGNORE"
-    args+=("${ign[@]}")
-  fi
-  if [[ -f requirements.txt ]]; then
-    args+=(-r requirements.txt)
-  else
-    log_warn "Sin requirements.txt: pip-audit auditará el entorno Python activo (active el venv del proyecto)"
-  fi
-  pip-audit "${args[@]}" >"$INFORME_DIR/pip-audit.log" 2>&1 || true
-  registrar_ejecucion pip-audit "$INFORME_DIR/pip-audit.json"
+  local -a ign=()
+  [[ -n "$PIP_IGNORE" ]] && read -r -a ign <<< "$PIP_IGNORE"
+  local d s json log req fuente
+  for d in "${DIRS_PYTHON[@]}"; do
+    s="$(slug "$d")"
+    json="$INFORME_DIR/pip-audit-$s.json"; log="${json%.json}.log"
+    local -a args=(-f json -o "$json" --progress-spinner off "${ign[@]}")
+    if [[ -f "$d/uv.lock" ]]; then
+      disponible uv || { log_warn "uv no disponible: $(comando_instalacion uv)"; continue; }
+      fuente="$d/uv.lock"
+      req="$INFORME_DIR/pip-audit-$s.requirements.txt"
+      if ! uv export --project "$d" --frozen --all-extras --all-groups --no-emit-workspace \
+             --format requirements-txt --quiet -o "$req" >"$log" 2>&1; then
+        no_ejecutada pip-audit "$d" "uv export falló sobre uv.lock; revise $(basename "$log")"
+        continue
+      fi
+      args+=(-r "$req" --require-hashes --disable-pip)
+    elif [[ -f "$d/requirements.txt" ]]; then
+      fuente="$d/requirements.txt"
+      args+=(-r "$d/requirements.txt")
+    else
+      fuente="$d/pyproject.toml"
+      args+=("$d")
+    fi
+    pip-audit "${args[@]}" >>"$log" 2>&1 || true
+    validar_json "$json" dependencies
+    registrar_ejecucion pip-audit "$json" "$d"
+    if [[ -s "$json" ]]; then registrar_fuente pip-audit "$d" "$fuente" "$json"; fi
+  done
 }
 
 # ------------------------------------------------------------------------------
@@ -442,6 +636,19 @@ import sys
 informe_dir, umbral_cli, manifiesto, ejecutadas, faltantes = sys.argv[1:6]
 NIVEL = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1, "INFO": 0}
 hoy = dt.date.today()
+
+
+def leer_tsv(nombre, campos):
+    ruta = os.path.join(informe_dir, nombre)
+    if not os.path.isfile(ruta):
+        return []
+    with open(ruta, encoding="utf-8") as f:
+        return [dict(zip(campos, l.rstrip("\n").split("\t"))) for l in f if l.strip()]
+
+
+# Qué analizó cada escáner de composición y cuáles no analizaron nada.
+fuentes = leer_tsv("fuentes.tsv", ("herramienta", "ruta", "fuente", "archivo"))
+no_ejecutadas = leer_tsv("no-ejecutadas.tsv", ("herramienta", "ruta", "motivo"))
 
 
 def cargar(nombre):
@@ -511,6 +718,8 @@ d = cargar("osv.json")
 if isinstance(d, dict):
     for res in d.get("results", []):
         origen = res.get("source", {}).get("path", "")
+        if os.path.isabs(origen):  # osv-scanner informa rutas absolutas
+            origen = os.path.relpath(origen)
         for p in res.get("packages", []):
             pk = p.get("package", {})
             grupos = {}
@@ -550,26 +759,38 @@ if d is not None:
             add("checkov", f.get("check_id"), f.get("severity") or "MEDIUM",
                 f"{f.get('file_path')}:{(f.get('file_line_range') or ['?'])[0]}", f.get("check", f.get("check_name", "")))
 
-# npm audit (formato npm >= 7)
-d = cargar("npm-audit.json")
-if isinstance(d, dict):
+# npm audit / pnpm audit, un informe por componente.
+for fu in (x for x in fuentes if x["herramienta"] == "npm-audit"):
+    d = cargar(fu["archivo"])
+    if not isinstance(d, dict):
+        continue
+    # npm >= 7
     for nombre, v in (d.get("vulnerabilities") or {}).items():
         ident = nombre
         for via in v.get("via", []):
             if isinstance(via, dict) and via.get("url"):
                 ident = via["url"].rsplit("/", 1)[-1]  # GHSA-xxxx
                 break
-        add("npm-audit", ident, v.get("severity"), f"package-lock.json:{nombre}@{v.get('range')}",
+        add("npm-audit", ident, v.get("severity"), f"{fu['fuente']}:{nombre}@{v.get('range')}",
             f"{nombre} ({'fix disponible' if v.get('fixAvailable') else 'sin fix'})")
+    # pnpm y npm 6
+    for a in (d.get("advisories") or {}).values():
+        ident = a.get("github_advisory_id") or str(a.get("url", "")).rsplit("/", 1)[-1] or a.get("id")
+        versiones = sorted({str(fd.get("version")) for fd in a.get("findings") or []})
+        add("npm-audit", ident, a.get("severity"),
+            f"{fu['fuente']}:{a.get('module_name')}@{','.join(versiones) or '?'}",
+            f"{a.get('title', '')} (corregido en {a.get('patched_versions') or 'ninguna'})")
 
 # pip-audit: sin severidad publicada -> HIGH (criterio conservador; documentado en el informe)
-d = cargar("pip-audit.json")
-if isinstance(d, dict):
+for fu in (x for x in fuentes if x["herramienta"] == "pip-audit"):
+    d = cargar(fu["archivo"])
+    if not isinstance(d, dict):
+        continue
     for dep in d.get("dependencies", []):
         for v in dep.get("vulns", []):
             aliases = [a for a in v.get("aliases", []) if a.startswith("CVE-")]
             add("pip-audit", aliases[0] if aliases else v.get("id"), "HIGH",
-                f"requirements:{dep.get('name')}@{dep.get('version')}",
+                f"{fu['fuente']}:{dep.get('name')}@{dep.get('version')}",
                 f"sin severidad publicada; fix: {', '.join(v.get('fix_versions') or []) or 'ninguno'}")
 
 # Excepciones vigentes del manifiesto
@@ -623,6 +844,10 @@ resumen = {
     "umbral": umbral,
     "herramientas_ejecutadas": [x for x in ejecutadas.split(",") if x],
     "herramientas_faltantes": [x for x in faltantes.split(",") if x],
+    # Un escáner sin fuentes o fallido no aprobó nada: no cuenta como ejecutado.
+    "herramientas_no_ejecutadas": no_ejecutadas,
+    "fuentes_sca": fuentes,
+    "cobertura": "parcial" if (no_ejecutadas or [x for x in faltantes.split(",") if x]) else "completa",
     "conteo_no_exceptuados": conteo,
     "exceptuados": sum(1 for h in hallazgos if h["exceptuado"]),
     "excepciones_vencidas": vencidas,
@@ -633,11 +858,22 @@ with open(os.path.join(informe_dir, "resumen.json"), "w", encoding="utf-8") as f
     json.dump(resumen, f, ensure_ascii=False, indent=2)
 
 orden = sorted(hallazgos, key=lambda h: (-NIVEL[h["severidad"]], h["herramienta"], h["id"]))
+parcial = resumen["cobertura"] == "parcial"
+if bloqueantes:
+    resultado = "BLOQUEA"
+elif not resumen["herramientas_ejecutadas"]:
+    resultado = "SIN ANÁLISIS (ninguna herramienta produjo resultados)"
+else:
+    resultado = "APROBADO CON COBERTURA PARCIAL" if parcial else "APROBADO"
+no_ej_txt = "; ".join(f"{x['herramienta']} en {x['ruta']} ({x['motivo']})" for x in no_ejecutadas)
 lineas = [f"# Informe de seguridad estática local — {resumen['fecha']}", "",
-          f"Umbral de bloqueo: **{umbral}** | Resultado: **{'BLOQUEA' if bloqueantes else 'APROBADO'}**", "",
+          f"Umbral de bloqueo: **{umbral}** | Resultado: **{resultado}**", "",
           f"Herramientas ejecutadas: {', '.join(resumen['herramientas_ejecutadas']) or 'ninguna'}  ",
-          f"Herramientas faltantes: {', '.join(resumen['herramientas_faltantes']) or 'ninguna'}", "",
-          "| Severidad | No exceptuados |", "|---|---|"]
+          f"Herramientas faltantes: {', '.join(resumen['herramientas_faltantes']) or 'ninguna'}  ",
+          f"Herramientas no ejecutadas (sin fuentes o con error; no cuentan como aprobadas): {no_ej_txt or 'ninguna'}", ""]
+lineas += ["## Fuentes de composición analizadas", "", "| Herramienta | Componente | Fuente |", "|---|---|---|"]
+lineas += [f"| {x['herramienta']} | {x['ruta']} | {x['fuente']} |" for x in fuentes] or ["| — | — | Ninguna: el análisis de composición está vacío |"]
+lineas += ["", "| Severidad | No exceptuados |", "|---|---|"]
 lineas += [f"| {s} | {conteo[s]} |" for s in ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO")]
 lineas += ["", f"Hallazgos exceptuados por el manifiesto: {resumen['exceptuados']}"]
 if vencidas:
@@ -665,6 +901,9 @@ if len(bloqueantes) > 25:
     print(f"  ... y {len(bloqueantes) - 25} más (ver resumen.md)")
 for i, m in vencidas:
     print(f"  [EXCEPCIÓN VENCIDA] {i}: {m}")
+for x in no_ejecutadas:
+    print(f"  [NO EJECUTADA] {x['herramienta']} en {x['ruta']}: {x['motivo']}")
+print(f"Resultado: {resultado}")
 sys.exit(1 if bloqueantes else 0)
 PY
 }
@@ -687,6 +926,8 @@ main() {
 
   INFORME_DIR="${INFORMES_BASE}/$(date +%Y%m%d-%H%M%S)"
   mkdir -p "$INFORME_DIR"
+  FUENTES_TSV="$INFORME_DIR/fuentes.tsv"; NO_EJECUTADAS_TSV="$INFORME_DIR/no-ejecutadas.tsv"
+  : > "$FUENTES_TSV"; : > "$NO_EJECUTADAS_TSV"
   [[ "$INFORMES_BASE" == "$INFORMES_BASE_DEFECTO" ]] && asegurar_gitignore "${INFORMES_BASE_DEFECTO}/"
 
   detectar_stack
@@ -710,6 +951,13 @@ main() {
     done
     log_warn "La cobertura local es parcial; el pipeline de CI ejecuta el conjunto completo."
   fi
+  if [[ -s "$NO_EJECUTADAS_TSV" ]]; then
+    log_seccion "Escáneres no ejecutados (sin fuentes o con error: no cuentan como aprobados)"
+    local herr ruta_ne motivo
+    while IFS=$'\t' read -r herr ruta_ne motivo; do
+      printf '  %-12s %-20s %s\n' "$herr" "$ruta_ne" "$motivo"
+    done < "$NO_EJECUTADAS_TSV"
+  fi
   if [[ ${#EJECUTADAS[@]} -eq 0 ]]; then
     log_error "No se ejecutó ninguna herramienta. Instale al menos gitleaks y semgrep (o use --instalar)."
     # Se devuelve 3 (error de ejecución) y no 0: un análisis vacío no puede aprobar un despliegue.
@@ -723,6 +971,9 @@ main() {
   log_info "Informe: ${INFORME_DIR}/resumen.md (enlace: ${INFORMES_BASE}/ultimo)"
   if [[ $rc -eq 0 ]]; then
     log_ok "Sin hallazgos por encima del umbral $UMBRAL"
+    if [[ ${#FALTANTES[@]} -gt 0 || -s "$NO_EJECUTADAS_TSV" ]]; then
+      log_warn "Cobertura PARCIAL: lo que no se ejecutó no está aprobado (ver arriba y resumen.md)."
+    fi
   else
     log_error "Hay hallazgos que bloquean (≥ umbral). Corrija o registre una excepción justificada y con vencimiento en $MANIFIESTO."
   fi

@@ -138,12 +138,15 @@ class EphemeralCertificateAuthority:
         ca_certificate_der: bytes,
         ca_signer: CaSigner,
         crl_url: str,
+        # Sin valor por defecto a propósito: con `prod` implícito, un llamador que
+        # olvidara pasarlo emitía en dev y staging certificados sin la marca de
+        # entorno, indistinguibles de uno real. El olvido tiene que ser un error.
+        environment: str,
         policy_oid: str | None = None,
         cps_url: str | None = None,
         user_notice: str | None = None,
         backdate_minutes: int = 5,
         validity_minutes: int = 15,
-        environment: str = "prod",
     ) -> None:
         self._ca_cert = x509.Certificate.load(ca_certificate_der)
         self._ca_signer = ca_signer
@@ -172,6 +175,19 @@ class EphemeralCertificateAuthority:
     @property
     def environment(self) -> str:
         return self._environment
+
+    @property
+    def marca_de_entorno(self) -> str | None:
+        """Marca que distingue a simple vista un artefacto que no vale como prueba.
+
+        ``None`` en producción. Fuera de ella, la misma marca va en la unidad
+        organizativa del certificado y en el bloque visible de constancia: si
+        cada uno la escribiera por su cuenta, un cambio en uno dejaría al otro
+        diciendo algo distinto sobre el mismo documento.
+        """
+        if self.is_production:
+            return None
+        return f"[NO VALIDO - ENTORNO {self._environment.upper()}]"
 
     @property
     def ca_serial_number(self) -> str:
@@ -251,9 +267,9 @@ class EphemeralCertificateAuthority:
         registra el número de serie del certificado. Dónde se reubica el
         identificador es una decisión abierta (P-03 en `docs/PENDIENTES.md`).
         """
-        if self.is_production:
+        marca = self.marca_de_entorno
+        if marca is None:
             return subject.organizational_unit
-        marca = f"[NO VALIDO - ENTORNO {self._environment.upper()}]"
         if subject.transaction_id:
             return f"{marca} {subject.organizational_unit} - TX {subject.transaction_id}"
         return f"{marca} {subject.organizational_unit}"
