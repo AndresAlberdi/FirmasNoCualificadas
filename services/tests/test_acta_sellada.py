@@ -123,6 +123,7 @@ def _acta(tenant: str = TENANT, nivel: int = 1) -> ActaPayload:
             closed_at=CERRADO,
         ),
         evidence_sha256="b" * 64,
+        environment=ENTORNO,
         tenant_reference="EXP-99887",
     )
 

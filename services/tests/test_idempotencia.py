@@ -94,6 +94,7 @@ def entorno(monkeypatch: pytest.MonkeyPatch) -> TransactionService:
         repositorio=TransactionRepository(),
         sellador=ActaSealer(llavero),
         jurisdiccion_por_defecto="PY",
+        environment="dev",
     )
     control = IdempotencyControl(InMemoryIdempotencyStore())
 

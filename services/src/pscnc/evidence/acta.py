@@ -140,6 +140,14 @@ class ActaPayload:
     service_level: int
     document: DocumentReference
     evidence_sha256: str
+    #: Entorno que produjo el acta. Se omite en producción y se declara en
+    #: cualquier otro: un acta de desarrollo no puede poder confundirse con una
+    #: real, y quien la reciba tiene que verlo sin analizar nada.
+    #:
+    #: Es obligatorio a propósito. Con un valor por defecto, un llamador que lo
+    #: olvidara emitiría en dev o staging un acta sin la marca, indistinguible de
+    #: una de producción: el olvido tiene que ser un error, no un acta.
+    environment: str
     #: Referencia del expediente en el sistema del inquilino, que es el registro
     #: autoritativo del contrato (ADR-0009). El acta y aquel se citan mutuamente.
     tenant_reference: str = ""
@@ -154,10 +162,6 @@ class ActaPayload:
     #: Número de serie del certificado efímero del firmante, para trazar la firma
     #: hasta el certificado que la produjo sin tener que abrir el PDF.
     signer_certificate_serial: str = ""
-    #: Entorno que produjo el acta. Se omite en producción y se declara en
-    #: cualquier otro: un acta de desarrollo no puede poder confundirse con una
-    #: real, y quien la reciba tiene que verlo sin analizar nada.
-    environment: str = "prod"
 
     def to_payload(self, *, sealed_at: datetime) -> dict[str, Any]:
         """Construye el diccionario que se canonicaliza y se sella."""
