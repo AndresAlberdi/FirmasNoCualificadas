@@ -133,6 +133,37 @@ def _pie_para(texto_pie: str) -> Any:
     return _pie
 
 
+def _alcance_del_sello(cualificado: bool | None) -> tuple[str, str, str]:
+    """Título, alcance y estado del sello de tiempo, según lo que registró la evidencia.
+
+    El expediente no puede afirmar una fecha cierta que la evidencia no respalda:
+    un sello de prueba acredita que el sistema funciona, no cuándo se firmó.
+    """
+    if cualificado is True:
+        return (
+            "Sello de tiempo cualificado (RFC 3161)",
+            "La fecha cierta proviene de una Autoridad de Sellado de Tiempo operada por un "
+            "Prestador Cualificado de Servicios de Confianza, con independencia del reloj de "
+            "los servidores de esta plataforma.",
+            "Sí",
+        )
+    if cualificado is False:
+        return (
+            "Sello de tiempo de pruebas (RFC 3161) — sin fecha cierta",
+            "El sello proviene de una autoridad de sellado de pruebas. Acredita que el sistema "
+            "funciona, no la fecha cierta del acto: este expediente no sirve para acreditar "
+            "cuándo se firmó el documento.",
+            "No — autoridad de pruebas",
+        )
+    return (
+        "Sello de tiempo (RFC 3161)",
+        "Este registro es anterior a que la evidencia declarara si la autoridad de sellado es "
+        "cualificada. Esa condición debe comprobarse sobre el certificado de la autoridad "
+        "incluido en el token antes de atribuirle fecha cierta.",
+        "No registrado",
+    )
+
+
 def build_evidence_report(item: AuditTrailItem) -> bytes:
     """Construye el expediente de evidencias en PDF a partir del ítem de auditoría.
 
@@ -272,6 +303,9 @@ def build_evidence_report(item: AuditTrailItem) -> bytes:
         Paragraph("4. Integridad del documento — ¿qué se firmó y cuándo?", estilos["seccion"])
     )
     if cripto is not None:
+        titulo_sello, alcance_sello, estado_sello = _alcance_del_sello(
+            cripto.tsa_evidence.tsa_qualified
+        )
         flujo += [
             KeepTogether(
                 [
@@ -289,17 +323,13 @@ def build_evidence_report(item: AuditTrailItem) -> bytes:
                     )
                 ]
             ),
-            Paragraph("Sello de tiempo cualificado (RFC 3161)", estilos["seccion"]),
-            Paragraph(
-                "La fecha cierta proviene de una Autoridad de Sellado de Tiempo operada por un "
-                "Prestador Cualificado de Servicios de Confianza, con independencia del reloj de "
-                "los servidores de esta plataforma.",
-                estilos["cuerpo"],
-            ),
+            Paragraph(titulo_sello, estilos["seccion"]),
+            Paragraph(alcance_sello, estilos["cuerpo"]),
             Spacer(1, 4),
             _tabla(
                 [
                     ("Autoridad de sellado", cripto.tsa_evidence.tsa_provider_name),
+                    ("Sello cualificado", estado_sello),
                     ("Hora oficial del sello", _fecha(cripto.tsa_evidence.timestamp_utc)),
                     ("Número de serie del token", cripto.tsa_evidence.tsa_serial_number or "—"),
                     (

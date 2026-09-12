@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -155,8 +155,11 @@ class ActaPayload:
     timestamp_token_sha256: str = ""
     #: Autoridad que emitió ese token.
     timestamp_authority: str = ""
-    #: ``False`` cuando el sello proviene de una TSA de pruebas.
-    timestamp_qualified: bool = True
+    #: ``False`` cuando el sello proviene de una TSA de pruebas. Obligatorio y
+    #: sin valor por defecto: con ``True`` implícito, un llamador que lo omitiera
+    #: sellaba fuera de producción un acta que declaraba cualificado un sello de
+    #: prueba. Sin sello (nivel 1) no se emite, pero igual se declara.
+    timestamp_qualified: bool = field(kw_only=True)
     #: Huella del documento ya firmado. Solo en nivel 2, donde los bytes cambian.
     signed_document_sha256: str = ""
     #: Número de serie del certificado efímero del firmante, para trazar la firma

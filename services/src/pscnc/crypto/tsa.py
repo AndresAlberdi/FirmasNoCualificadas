@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import base64
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Protocol
 
@@ -38,8 +38,10 @@ class TimestampResult:
     #: ``False`` cuando el sello proviene de una TSA de pruebas. Viaja hasta el
     #: acta y hasta el expediente: un sello de prueba acredita el funcionamiento
     #: del sistema, no la fecha cierta del acto, y la diferencia tiene que ser
-    #: legible sin analizar el token.
-    qualified: bool = True
+    #: legible sin analizar el token. Obligatorio y sin valor por defecto: un
+    #: llamador que lo omitiera produciría fuera de producción un sello declarado
+    #: cualificado, que es justo la confusión que el campo existe para evitar.
+    qualified: bool = field(kw_only=True)
 
 
 class TimeStamperDelegate(Protocol):
@@ -62,7 +64,7 @@ def _pem(der: bytes) -> str:
 
 
 def parse_timestamp_token(
-    token: cms.ContentInfo, *, provider_name: str, qualified: bool = True
+    token: cms.ContentInfo, *, provider_name: str, qualified: bool
 ) -> TimestampResult:
     """Extrae los datos periciales relevantes de un token RFC 3161."""
     try:
@@ -106,9 +108,12 @@ class RecordingTimeStamper(TimeStamper):
         password: str | None = None,
         timeout: int = 10,
         max_retries: int = 3,
+        qualified: bool,
         delegate: TimeStamperDelegate | None = None,
-        qualified: bool = True,
     ) -> None:
+        # `qualified` no tiene valor por defecto: quien construye el sellador sabe
+        # si la autoridad es de pruebas, y tiene que decirlo. Con `True` implícito,
+        # omitirlo en dev o staging declaraba cualificado un sello de prueba.
         # `delegate` permite inyectar un sellador de pruebas; en producción siempre
         # es nulo y se construye el cliente HTTP contra la TSA cualificada.
         if delegate is None:
@@ -132,6 +137,11 @@ class RecordingTimeStamper(TimeStamper):
         self._max_retries = max_retries
         self._qualified = qualified
         self._last_token: cms.ContentInfo | None = None
+
+    @property
+    def qualified(self) -> bool:
+        """Si el sello que obtiene este sellador otorga fecha cierta."""
+        return self._qualified
 
     # pyHanko invoca este método durante el firmado.
     async def async_timestamp(self, message_digest: bytes, md_algorithm: str) -> cms.ContentInfo:
