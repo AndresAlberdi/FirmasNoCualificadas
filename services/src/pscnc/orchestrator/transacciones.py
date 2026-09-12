@@ -158,9 +158,9 @@ class TransactionService:
         repositorio: TransactionStore,
         sellador: ActaSealer,
         jurisdiccion_por_defecto: str,
+        environment: str,
         ttl_minutos: int = 60,
         firmante_pades: PadesSigner | None = None,
-        environment: str = "prod",
     ) -> None:
         self._repo = repositorio
         self._sellador = sellador

@@ -92,6 +92,7 @@ def test_el_acta_no_se_construye_sin_declararla() -> None:
             transaction_id="tx-1",
             jurisdiction="PY",
             service_level=2,
+            environment="dev",
             document=DocumentReference(
                 sha256="a" * 64, version=1, code="DOC-1", closed_at=datetime.now(UTC)
             ),
@@ -109,6 +110,7 @@ def test_el_acta_publica_lo_que_se_declaro(cualificado: bool) -> None:
         transaction_id="tx-1",
         jurisdiction="PY",
         service_level=2,
+        environment="dev",
         document=DocumentReference(
             sha256="a" * 64, version=1, code="DOC-1", closed_at=datetime.now(UTC)
         ),

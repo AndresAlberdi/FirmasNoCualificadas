@@ -142,6 +142,7 @@ def servicio(ca_certificate_der, ca_signer):  # type: ignore[no-untyped-def]
         ca_certificate_der=ca_certificate_der,
         ca_signer=ca_signer,
         crl_url="https://crl.pruebas.example.py/pscnc/intermediate.crl",
+        environment="prod",
     )
     firmante = PadesSigner(
         certificate_authority=autoridad,
