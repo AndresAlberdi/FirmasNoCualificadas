@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -176,6 +177,74 @@ class TestArtefactosDeDesarrolloMarcados:
         )
 
         assert "NO VALIDO" not in emitido.certificate.subject.native["organizational_unit_name"]
+
+    @pytest.mark.parametrize(
+        ("entorno", "marcado"), [("dev", True), ("staging", True), ("prod", False)]
+    )
+    def test_la_ca_del_flujo_legado_hereda_el_entorno_de_la_configuracion(
+        self,
+        entorno: str,
+        marcado: bool,
+        ca_certificate_der: bytes,
+        ca_signer: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """La CA que arma `build_signing_service` toma el entorno de la configuración.
+
+        Es la que atiende `/v1/signing-sessions/*`. Construida sin el entorno,
+        tomaba el valor por defecto del constructor —`prod`— y emitía en dev y
+        staging certificados sin la marca, indistinguibles de uno real.
+        """
+        import pscnc.orchestrator.dependencies as dependencias
+        from pscnc.config import get_settings
+
+        certificado_ca = tmp_path / "ca.der"
+        certificado_ca.write_bytes(ca_certificate_der)
+        for variable, valor in {
+            "PSCNC_ENVIRONMENT": entorno,
+            "PSCNC_CRYPTO_BACKEND": "kms",
+            "PSCNC_KMS_CA_KEY_ID": "alias/fnc/pruebas/ca",
+            "PSCNC_CA_CERT_PATH": str(certificado_ca),
+            "PSCNC_CRL_DISTRIBUTION_URL": "https://crl.pruebas.example/intermediate.crl",
+            "PSCNC_TSA_URL": "https://tsa.pruebas.example",
+            "PSCNC_TSA_PROVIDER_NAME": "TSA de Pruebas",
+            "PSCNC_SIGNED_BUCKET": "firmados-pruebas",
+            "PSCNC_EVIDENCE_BUCKET": "evidencias-pruebas",
+            # boto3 resuelve la cadena de credenciales al construir los clientes: sin
+            # esto, la prueba dependería de la configuración de AWS de quien la corre.
+            "AWS_ACCESS_KEY_ID": "pruebas",
+            "AWS_SECRET_ACCESS_KEY": "pruebas",
+            "AWS_CONFIG_FILE": str(tmp_path / "sin-config-aws"),
+            "AWS_SHARED_CREDENTIALS_FILE": str(tmp_path / "sin-credenciales-aws"),
+        }.items():
+            monkeypatch.setenv(variable, valor)
+        monkeypatch.delenv("AWS_PROFILE", raising=False)
+        # Solo se reemplaza el acceso a KMS: el resto es la composición real.
+        monkeypatch.setattr(dependencias, "build_ca_signer", lambda _ajustes: ca_signer)
+        get_settings.cache_clear()
+        dependencias.build_signing_service.cache_clear()
+        try:
+            servicio = dependencias.build_signing_service()
+        finally:
+            get_settings.cache_clear()
+            dependencias.build_signing_service.cache_clear()
+
+        autoridad = servicio._ca
+        emitido = autoridad.issue(
+            SubjectData.for_jurisdiction(
+                get_profile("PY"),
+                given_name="María José",
+                surname="Ruiz Díaz",
+                national_id="4829153",
+                transaction_id="tx-1",
+            )
+        )
+        ou = emitido.certificate.subject.native["organizational_unit_name"]
+
+        assert autoridad.environment == entorno
+        assert ("NO VALIDO" in ou) is marcado
+        assert ou.startswith(f"[NO VALIDO - ENTORNO {entorno.upper()}]") is marcado
 
     def test_el_acta_de_desarrollo_se_declara_como_tal(
         self, servicio: TransactionService, pdf_de_prueba: bytes

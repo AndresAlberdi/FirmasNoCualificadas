@@ -24,7 +24,11 @@ from jurisdictions import JurisdictionProfile
 from pscnc.crypto.constancia import (
     ALTO_MINIMO,
     ANCHO_MINIMO,
+    LADO_QR,
+    SEPARACION_QR,
+    TAMANO_FUENTE,
     ConstanciaFirma,
+    alto_necesario,
     componer_bloque,
 )
 from pscnc.crypto.ephemeral_ca import EphemeralCertificateAuthority, IssuedCertificate, SubjectData
@@ -49,18 +53,21 @@ class VisualSignatureSpec:
     #: deja de ser un rótulo y pasa a ser el bloque completo con su QR.
     constancia: ConstanciaFirma | None = None
 
-    def con_espacio_para_la_constancia(self) -> VisualSignatureSpec:
-        """Agranda la caja si hace falta para que el bloque no se recorte.
+    def con_espacio_para_la_constancia(self, bloque: str | None = None) -> VisualSignatureSpec:
+        """Agranda la caja si hace falta para que el bloque no se recorte ni se achique.
 
         Un bloque recortado es peor que ninguno: deja a la vista media huella y
-        media declaración, y las dos cosas dejan de significar lo que dicen.
+        media declaración, y las dos cosas dejan de significar lo que dicen. Uno
+        que no entra tampoco se recorta, pero pyHanko lo escala hasta volverlo
+        ilegible. Con el texto ya compuesto, el alto se ajusta a sus renglones.
         """
         if self.constancia is None:
             return self
+        alto = alto_necesario(bloque) if bloque is not None else ALTO_MINIMO
         return replace(
             self,
             width=max(self.width, ANCHO_MINIMO),
-            height=max(self.height, ALTO_MINIMO),
+            height=max(self.height, alto),
         )
 
     @property
@@ -136,11 +143,25 @@ class PadesSigner:
         emitido = self._ca.issue(subject)
         timestamper = self._timestamper_factory()
 
+        visual = visual or VisualSignatureSpec()
+        # El bloque lleva la misma marca de entorno que el certificado, tomada de
+        # la misma autoridad: los dos describen el mismo documento.
+        bloque = (
+            componer_bloque(
+                visual.constancia,
+                self._jurisdiction,
+                marca_entorno=self._ca.marca_de_entorno,
+            )
+            if visual.constancia is not None
+            else None
+        )
+
         firmado = self._apply_signature(
             pdf_bytes,
             emitido,
             timestamper=timestamper,
-            visual=(visual or VisualSignatureSpec()).con_espacio_para_la_constancia(),
+            visual=visual.con_espacio_para_la_constancia(bloque),
+            bloque=bloque,
             field_name=field_name,
         )
 
@@ -171,7 +192,7 @@ class PadesSigner:
         )
 
     # -------------------------------------------------------------- Interno --
-    def _estilo_de_sello(self, visual: VisualSignatureSpec) -> Any:
+    def _estilo_de_sello(self, bloque: str | None) -> Any:
         """Estilo de la apariencia del campo de firma.
 
         Sin constancia devuelve ``None`` y pyHanko usa su apariencia por defecto.
@@ -182,8 +203,12 @@ class PadesSigner:
         El QR no es adorno. La huella se imprime abreviada para que entre; el
         valor completo vive en la constancia, y el QR es lo que lleva hasta ella
         sin obligar a nadie a transcribir sesenta y cuatro caracteres.
+
+        El lado del QR se fija. Si se lo deja a pyHanko, lo deriva de la caja y
+        del texto, y cuando algo no entra achica todo junto: el QR terminaba en
+        unos milímetros, por debajo de lo que un teléfono alcanza a leer.
         """
-        if visual.constancia is None:
+        if bloque is None:
             return None
 
         from pyhanko.pdf_utils import text as pdf_text
@@ -193,8 +218,10 @@ class PadesSigner:
         # QR, y repetirla en letra chica no ayuda a nadie. pyHanko exige que el
         # parámetro exista igual, y se lo pasa `_apply_signature`.
         return QRStampStyle(
-            stamp_text=componer_bloque(visual.constancia, self._jurisdiction),
-            text_box_style=pdf_text.TextBoxStyle(font_size=7),
+            stamp_text=bloque,
+            text_box_style=pdf_text.TextBoxStyle(font_size=TAMANO_FUENTE),
+            qr_inner_size=LADO_QR,
+            innsep=SEPARACION_QR,
         )
 
     def _apply_signature(
@@ -204,6 +231,7 @@ class PadesSigner:
         *,
         timestamper: RecordingTimeStamper,
         visual: VisualSignatureSpec,
+        bloque: str | None,
         field_name: str,
     ) -> bytes:
         from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
@@ -248,7 +276,7 @@ class PadesSigner:
             signer=signer,
             timestamper=timestamper,
             new_field_spec=field_spec,
-            stamp_style=self._estilo_de_sello(visual),
+            stamp_style=self._estilo_de_sello(bloque),
         )
 
         entrada = io.BytesIO(pdf_bytes)
