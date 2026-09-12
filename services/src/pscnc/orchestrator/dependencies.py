@@ -105,6 +105,7 @@ def build_signing_service() -> SigningService:
         ),
         backdate_minutes=settings.ephemeral_cert_backdate_minutes,
         validity_minutes=settings.ephemeral_cert_validity_minutes,
+        environment=settings.environment,
     )
 
     signer = PadesSigner(
