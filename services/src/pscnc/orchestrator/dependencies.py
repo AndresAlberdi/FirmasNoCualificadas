@@ -105,9 +105,6 @@ def build_signing_service() -> SigningService:
         ),
         backdate_minutes=settings.ephemeral_cert_backdate_minutes,
         validity_minutes=settings.ephemeral_cert_validity_minutes,
-        # Como en `build_pades_signer`: sin el entorno, la CA asume producción y
-        # emite el certificado sin la marca `[NO VALIDO - ENTORNO …]` en la OU.
-        environment=settings.environment,
     )
 
     signer = PadesSigner(
