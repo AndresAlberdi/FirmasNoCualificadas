@@ -16,6 +16,8 @@ Todos los datos son sintéticos.
 
 from __future__ import annotations
 
+import dataclasses
+import inspect
 import json
 import re
 from datetime import UTC, datetime, timedelta
@@ -27,8 +29,9 @@ from jwcrypto import jwk as jose_jwk
 from jwcrypto import jws as jose_jws
 
 from conftest import KmsFiel
+from pscnc.config import Settings
 from pscnc.crypto.tenant_keys import TenantKeyRing
-from pscnc.evidence.acta import ActaSealer
+from pscnc.evidence.acta import ActaPayload, ActaSealer
 from pscnc.evidence.claves_publicas import jwk_desde_der
 from pscnc.models.motivos import RETRYABLE_REASONS, TERMINAL_REASONS, RejectionReason
 from pscnc.models.v1 import (
@@ -80,6 +83,7 @@ def servicio(llavero: TenantKeyRing) -> TransactionService:
         repositorio=TransactionRepository(),
         sellador=ActaSealer(llavero),
         jurisdiccion_por_defecto="PY",
+        environment=ENTORNO,
     )
 
 
@@ -309,6 +313,7 @@ class TestAislamientoYEstados:
             repositorio=TransactionRepository(),
             sellador=ActaSealer(llavero),
             jurisdiccion_por_defecto="PY",
+            environment=ENTORNO,
             ttl_minutos=0,
         )
         creada = servicio.crear(tenant_id=TENANT, peticion=_crear())
@@ -539,3 +544,83 @@ class TestIntegracionSeguroLoTengo:
             "code",
             "closed_at",
         }
+
+
+# ------------------------------------------ Entorno de la configuración ----
+class TestEntornoHeredadoDeLaConfiguracion:
+    """Fuera de producción, el acta se declara como tal.
+
+    La marca depende de que el entorno recorra la cadena entera: configuración →
+    `build_transaction_service` → `TransactionService` → `ActaPayload`. Con un
+    valor por defecto `prod` en cualquier eslabón, un llamador que olvidara
+    pasarlo producía en dev o staging un acta sin marca, indistinguible de una
+    real.
+    """
+
+    def test_el_acta_no_tiene_entorno_por_defecto(self) -> None:
+        campo = next(c for c in dataclasses.fields(ActaPayload) if c.name == "environment")
+
+        assert campo.default is dataclasses.MISSING
+        assert campo.default_factory is dataclasses.MISSING
+
+    def test_el_servicio_no_tiene_entorno_por_defecto(self) -> None:
+        parametro = inspect.signature(TransactionService).parameters["environment"]
+
+        assert parametro.default is inspect.Parameter.empty
+
+    @pytest.mark.parametrize(
+        ("entorno", "marcada"), [("dev", True), ("staging", True), ("prod", False)]
+    )
+    def test_el_acta_hereda_el_entorno_de_la_configuracion(
+        self, entorno: str, marcada: bool, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """El servicio que arma `build_transaction_service` sella con el entorno configurado."""
+        import base64
+
+        import pscnc.orchestrator.dependencies as dependencias
+        from pscnc.config import get_settings
+
+        for variable, valor in {
+            "PSCNC_ENVIRONMENT": entorno,
+            "PSCNC_CRYPTO_BACKEND": "kms",
+            "PSCNC_TENANT_IDS": json.dumps([TENANT]),
+            # Sin TSA ni certificado de CA no se arma el firmante PAdES: el acta
+            # del nivel 1 alcanza para ver la marca.
+            "PSCNC_TSA_URL": "",
+            "PSCNC_CA_CERT_PATH": "",
+        }.items():
+            monkeypatch.setenv(variable, valor)
+
+        # Solo se reemplazan KMS y la persistencia: el resto es la composición real.
+        kms = KmsFiel([f"alias/fnc/{entorno}/{TENANT}/acta-seal/v1"])
+
+        def llavero_con_kms_fiel(tenant: str, ajustes: Settings | None = None) -> TenantKeyRing:
+            assert ajustes is not None
+            return TenantKeyRing(
+                tenant, environment=ajustes.environment, region="us-east-1", client=kms
+            )
+
+        monkeypatch.setattr(dependencias, "build_tenant_key_ring", llavero_con_kms_fiel)
+        monkeypatch.setattr(
+            dependencias, "_build_transaction_repository", lambda _ajustes: TransactionRepository()
+        )
+        get_settings.cache_clear()
+        dependencias.build_transaction_service.cache_clear()
+        try:
+            servicio = dependencias.build_transaction_service()
+        finally:
+            get_settings.cache_clear()
+            dependencias.build_transaction_service.cache_clear()
+
+        creada = servicio.crear(tenant_id=TENANT, peticion=_crear())
+        confirmada = servicio.confirmar(
+            tenant_id=TENANT, transaction_id=creada.transaction_id, peticion=_confirmar()
+        )
+        payload = json.loads(base64.urlsafe_b64decode(confirmada.acta.jws.split(".")[1] + "=="))
+
+        if marcada:
+            assert payload["environment"] == entorno
+            assert payload["not_valid_for_production"] is True
+        else:
+            assert "environment" not in payload
+            assert "not_valid_for_production" not in payload

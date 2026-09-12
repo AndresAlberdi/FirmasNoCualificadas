@@ -515,6 +515,7 @@ class TestContratoDelNivel2:
                 TenantKeyRing(TENANT, environment="dev", region="us-east-1", client=kms)
             ),
             jurisdiccion_por_defecto="PY",
+            environment="dev",
         )
 
         with pytest.raises(TransactionRejectedError) as error:
