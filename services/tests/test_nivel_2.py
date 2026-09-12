@@ -237,7 +237,11 @@ class TestSinFechaCiertaNoHayFirma:
             from pscnc.crypto.tsa import RecordingTimeStamper
 
             return RecordingTimeStamper(
-                "", provider_name="TSA caída", delegate=Caido(), max_retries=1
+                "",
+                provider_name="TSA caída",
+                qualified=False,
+                delegate=Caido(),
+                max_retries=1,
             )
 
         kms = KmsFiel([f"alias/fnc/dev/{TENANT}/acta-seal/v1"])
@@ -279,7 +283,11 @@ class TestSinFechaCiertaNoHayFirma:
             from pscnc.crypto.tsa import RecordingTimeStamper
 
             return RecordingTimeStamper(
-                "", provider_name="TSA caída", delegate=Caido(), max_retries=1
+                "",
+                provider_name="TSA caída",
+                qualified=False,
+                delegate=Caido(),
+                max_retries=1,
             )
 
         kms = KmsFiel([f"alias/fnc/dev/{TENANT}/acta-seal/v1"])

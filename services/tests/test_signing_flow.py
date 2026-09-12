@@ -148,6 +148,7 @@ def servicio(ca_certificate_der, ca_signer):  # type: ignore[no-untyped-def]
         timestamper_factory=lambda: RecordingTimeStamper(
             "",
             provider_name="TSA de Pruebas",
+            qualified=False,
             delegate=DummyTimeStamper(tsa_cert=tsa_cert, tsa_key=tsa_key),
         ),
         jurisdiction=get_profile("PY"),

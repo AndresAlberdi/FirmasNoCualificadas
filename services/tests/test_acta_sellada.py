@@ -124,6 +124,8 @@ def _acta(tenant: str = TENANT, nivel: int = 1) -> ActaPayload:
         ),
         evidence_sha256="b" * 64,
         tenant_reference="EXP-99887",
+        # Sin sello de tiempo el campo no se emite, pero se declara igual.
+        timestamp_qualified=False,
     )
 
 
