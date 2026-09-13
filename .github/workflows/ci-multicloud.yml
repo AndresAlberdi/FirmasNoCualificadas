@@ -394,7 +394,7 @@ jobs:
       # ---- ecs: imagen → ECR --------------------------------------------------
       - name: Credenciales AWS (OIDC)
         if: matrix.componente.proveedor == 'ecs' && env.PUBLICAR == 'true'
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN_STAGING }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -443,7 +443,7 @@ jobs:
           format: table
       - name: SBOM
         if: steps.nombre.outputs.imagen != ''
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
         with:
           image: ${{ steps.nombre.outputs.imagen }}
           format: spdx-json
@@ -583,7 +583,7 @@ jobs:
       # ---- AWS (ecs) -----------------------------------------------------------
       - name: Credenciales AWS (OIDC)
         if: matrix.componente.proveedor == 'ecs'
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN_STAGING }}
           aws-region: ${{ matrix.componente.staging.region || vars.AWS_REGION }}
@@ -852,7 +852,7 @@ jobs:
       # ---- AWS ------------------------------------------------------------------
       - name: Credenciales AWS (OIDC, rol de producción)
         if: matrix.componente.proveedor == 'ecs'
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
           aws-region: ${{ matrix.componente.production.region || vars.AWS_REGION }}
