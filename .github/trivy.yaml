@@ -1,11 +1,18 @@
 # =============================================================================
 # trivy.yaml — Configuración base de Trivy (fs, image, config)
-# Versión: 2.0 | Fecha: 2026-08-24 | Destino: .github/trivy.yaml
+# Versión: 2.1 | Fecha: 2026-09-12 | Destino: .github/trivy.yaml
 # -----------------------------------------------------------------------------
 # Los workflows pasan `trivy-config: .github/trivy.yaml`. Los parámetros
-# explícitos del workflow (severity, exit-code, format, scanners) tienen
-# prioridad sobre este archivo; aquí van los valores comunes y las exclusiones.
+# explícitos (flags como --severity o --exit-code, y variables TRIVY_*) tienen
+# prioridad sobre este archivo —medido con Trivy 0.70.0—; aquí van los valores
+# comunes y las exclusiones.
 # Referencia: https://trivy.dev/latest/docs/references/configuration/config-file/
+#
+# 2.1 (2026-09-12): corregido el comentario sobre `severity`, que afirmaba lo
+# contrario de lo que hace Trivy; quitada la lista de escáneres de
+# misconfiguración (dos entradas inválidas hacían que Trivy la descartara
+# entera); `vulnerability.type` pasa a `pkg.types`; se incluyen las
+# dependencias de desarrollo. Una copia que diga 2.0 está desactualizada.
 # =============================================================================
 
 # Tiempo máximo por escaneo (imágenes grandes o monorepos)
@@ -29,7 +36,8 @@ severity:
   - HIGH
   - MEDIUM
 
-# Código de salida cuando hay hallazgos de las severidades indicadas
+# Código de salida cuando hay hallazgos de las severidades indicadas.
+# security-local.sh lo anula con --exit-code 0 y aplica el umbral al consolidar.
 exit-code: 1
 
 # Escáneres por defecto para `trivy fs` (los workflows los acotan con --scanners)
@@ -61,6 +69,7 @@ scan:
     - "**/*.min.js"
     - "**/*.map"
 
+
 vulnerability:
   # No bloquear por CVEs sin parche disponible: no hay acción posible salvo
   # cambiar la imagen base. Se registran en el informe.
@@ -72,6 +81,11 @@ pkg:
   types:
     - os
     - library
+  # Incluye devDependencies (medido con npm y pnpm). Corren en el CI con acceso
+  # a secretos al instalar, compilar y probar: un paquete malicioso ahí es un
+  # ataque de cadena de suministro. Sin esto, un paquete que solo tiene
+  # dependencias de desarrollo —un SDK, por ejemplo— no se analiza.
+  include-dev-deps: true
 
 misconfiguration:
   include-non-failures: false

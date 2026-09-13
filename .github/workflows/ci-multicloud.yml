@@ -71,8 +71,9 @@ jobs:
   # ---------------------------------------------------------------------------
   # Fase 0 — preparar: lee y VALIDA .devsecops.yml (D4) y publica las matrices
   # en JSON. Valida: version == 1, nombres únicos, proveedor soportado, url
-  # https, bloquear_en contiene CRITICAL y HIGH, excepciones vencidas (aviso) y
-  # en Modo B0 la fecha_modo (aviso >= 30 días, fallo >= 45).
+  # https, bloquear_en contiene CRITICAL y HIGH y excepciones vencidas (aviso).
+  # El límite del Modo B0 (fecha_modo) lo aplica _reusable-security.yml, que
+  # llaman todos los ci-*: vivía solo aquí y los demás no lo comprobaban.
   # PyYAML está preinstalado en ubuntu-latest.
   # ---------------------------------------------------------------------------
   preparar:
@@ -149,19 +150,8 @@ jobs:
                   vence = dt.date.fromisoformat(str(vence))
               if vence < hoy:
                   print(f"::warning::Excepción vencida descartada: {e.get('id')} ({e.get('herramienta')}, venció {vence})")
-          # Modo B0: transición con fecha límite (aviso 30 días, fallo 45)
-          if m.get("modo") == "B0":
-              fecha = m.get("fecha_modo")
-              if not fecha:
-                  errores.append("modo B0 exige fecha_modo (fecha de entrada al modo)")
-              else:
-                  if not isinstance(fecha, dt.date):
-                      fecha = dt.date.fromisoformat(str(fecha))
-                  dias = (hoy - fecha).days
-                  if dias >= 45:
-                      errores.append(f"Modo B0 lleva {dias} días (máximo 45): migre a Modo B o vuelva a público")
-                  elif dias >= 30:
-                      print(f"::warning::Modo B0 lleva {dias} días; planifique la salida antes de los 45")
+          # El límite del Modo B0 no va aquí: ver el paso "Límite del Modo B0
+          # (fecha_modo)" de _reusable-security.yml.
           if errores:
               for e in errores:
                   print(f"::error::{e}")
