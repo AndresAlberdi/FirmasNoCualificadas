@@ -60,7 +60,14 @@ resource "aws_cloudfront_origin_access_control" "crl" {
   signing_protocol                  = "sigv4"
 }
 
-resource "aws_cloudfront_distribution" "crl" {
+# Semgrep marca el TLS mínimo. Con certificado propio (crl_certificate_arn)
+# ya es TLSv1.2_2021; con el certificado por defecto de CloudFront, AWS fija
+# TLSv1 y no se puede cambiar. Lo que se sirve es la lista de revocación:
+# pública por diseño y firmada por la CA, así que el cliente verifica su
+# integridad por la firma y no hay confidencialidad que proteger. Mismo
+# criterio que las excepciones de WAF de esta distribución en .devsecops.yml.
+# Para exigir TLS 1.2, pasar crl_certificate_arn en el ambiente.
+resource "aws_cloudfront_distribution" "crl" { # nosemgrep: terraform.aws.security.aws-cloudfront-insecure-tls.aws-insecure-cloudfront-distribution-tls-version -- CRL pública y firmada; con certificado propio el mínimo es TLSv1.2_2021
   enabled         = true
   comment         = "Distribucion de CRL del PSCNC (${var.environment})"
   is_ipv6_enabled = true

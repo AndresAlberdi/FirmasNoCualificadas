@@ -19,7 +19,11 @@ locals {
   account_id = data.aws_caller_identity.current.account_id
 }
 
-resource "aws_kms_key" "intermediate_ca" {
+# Semgrep pide enable_key_rotation. Es la clave de firma de la CA intermedia,
+# asimétrica (SIGN_VERIFY, RSA_4096 por defecto), y KMS solo admite rotación
+# automática en claves simétricas de cifrado. Renovar la clave de una CA es
+# emitir un certificado nuevo, no rotar material en KMS.
+resource "aws_kms_key" "intermediate_ca" { # nosemgrep: terraform.aws.security.aws-kms-no-rotation.aws-kms-no-rotation -- clave asimétrica de firma de la CA: KMS no admite rotación automática
   description              = "PSCNC Paraguay - Intermediate CA signing key (${var.environment})"
   key_usage                = "SIGN_VERIFY"
   customer_master_key_spec = var.key_spec
