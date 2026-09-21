@@ -44,7 +44,11 @@ locals {
 # 1. Clave de sello del acta de evidencia
 ###############################################################################
 
-resource "aws_kms_key" "acta_seal" {
+# Semgrep pide enable_key_rotation. Esta clave es asimétrica (SIGN_VERIFY,
+# ECC_NIST_P256) y KMS solo admite rotación automática en claves simétricas
+# de cifrado: el atributo no se puede activar. La clave simétrica de este
+# módulo (evidence) sí rota. Rotar una clave de sello es emitir una nueva.
+resource "aws_kms_key" "acta_seal" { # nosemgrep: terraform.aws.security.aws-kms-no-rotation.aws-kms-no-rotation -- clave asimétrica de firma: KMS no admite rotación automática
   description = "PSCNC - Sello de acta de evidencia del inquilino ${var.tenant_id} (${var.environment})"
   key_usage   = "SIGN_VERIFY"
   # ECDSA P-256: es el algoritmo de `ES256`, el mejor soportado del ecosistema

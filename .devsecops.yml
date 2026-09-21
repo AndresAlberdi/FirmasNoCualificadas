@@ -60,6 +60,22 @@ seguridad:
   bloquear_en: [CRITICAL, HIGH]   # se puede endurecer (añadir MEDIUM), nunca relajar
   # Cada excepción vence: pasada esa fecha el hallazgo vuelve a bloquear.
   excepciones:
+    - id: package_managers.npm.npm-missing-minimum-release-age.npm-missing-minimum-release-age
+      herramienta: semgrep
+      componente: dashboard
+      justificacion: >-
+        pnpm 9.15.9 no admite minimumReleaseAge (según su documentación llegó en la 10.16); agregar la clave al .npmrc apagaría la alerta sin proteger nada. Mitigan mientras tanto: cooldown de 7 días de Dependabot, lockfile congelado e ignore-scripts. Se resuelve al migrar a pnpm >= 10.16 con minimumReleaseAge.
+      aprobado_por: AndresAlberdi
+      creado: "2026-09-20"
+      vence: "2026-12-19"
+    - id: package_managers.npm.npm-missing-minimum-release-age.npm-missing-minimum-release-age
+      herramienta: semgrep
+      componente: sdk
+      justificacion: >-
+        pnpm 9.15.9 no admite minimumReleaseAge (según su documentación llegó en la 10.16); agregar la clave al .npmrc apagaría la alerta sin proteger nada. Mitigan mientras tanto: cooldown de 7 días de Dependabot, lockfile congelado e ignore-scripts. Se resuelve al migrar a pnpm >= 10.16 con minimumReleaseAge.
+      aprobado_por: AndresAlberdi
+      creado: "2026-09-20"
+      vence: "2026-12-19"
     - id: AWS-0011
       herramienta: trivy
       componente: infra
