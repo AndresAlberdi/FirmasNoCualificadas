@@ -315,6 +315,9 @@ jobs:
       # Sin pull-requests: write: los escáneres no comentan en el PR.
       security-events: write
       actions: read
+      # El job `secretos` del reusable (2.6) lo pide para que Gitleaks liste los
+      # commits del PR; un llamador no puede conceder menos de lo que el reusable pide.
+      pull-requests: read
     uses: ./.github/workflows/_reusable-security.yml
     with:
       ruta: ${{ matrix.componente.ruta }}

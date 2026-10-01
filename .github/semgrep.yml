@@ -1,6 +1,6 @@
 # =============================================================================
 # semgrep.yml — Reglas propias de Semgrep CE del estándar
-# Versión: 2.0 | Fecha: 2026-08-24 | Destino: .github/semgrep.yml
+# Versión: 2.1 | Fecha: 2026-09-12 | Destino: .github/semgrep.yml
 # -----------------------------------------------------------------------------
 # _reusable-security.yml las carga automáticamente si el archivo existe
 # (--config .github/semgrep.yml) además de p/ci, p/owasp-top-ten y p/secrets.
