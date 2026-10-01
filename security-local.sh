@@ -2,7 +2,7 @@
 # ==============================================================================
 # security-local.sh — Equivalente local de _reusable-security.yml
 # ==============================================================================
-# Versión: 2.4 | Fecha: 2026-09-12
+# Versión: 2.5 | Fecha: 2026-09-20
 # Documentos relacionados: 00-gobernanza/01-politica-cicd-devsecops.md (secciones 3.1, 6 y 8),
 #   02-pipelines/workflows/_reusable-security.yml, 02-pipelines/config/{gitleaks.toml,semgrep.yml,trivy.yaml}
 #
@@ -21,6 +21,12 @@
 # (services/uv.lock, dashboard/pnpm-lock.yaml). Un escáner que no encontró
 # fuentes, o que falló, figura en el resumen como NO EJECUTADO y el resultado
 # se marca como de cobertura parcial: un análisis vacío no es un análisis limpio.
+#
+# Manifiesto: antes de leerlo se valida con .github/scripts/validar-manifiesto.py,
+# el MISMO archivo que ejecuta el job `preparar` de CI (esquema, `componente`
+# declarado y vigencia de las excepciones). Si no valida, el análisis se detiene
+# con código 3: las excepciones salen de ahí y un manifiesto roto daría un
+# informe con apariencia de limpio.
 #
 # Excepciones (D5): igual que el job `preparar` de _reusable-security.yml, este
 # script lee `seguridad.excepciones[]` de .devsecops.yml, descarta las vencidas
@@ -51,8 +57,12 @@
 # ==============================================================================
 set -Eeuo pipefail
 
-readonly SCRIPT_VERSION="2.4"
+readonly SCRIPT_VERSION="2.5"
 readonly MANIFIESTO=".devsecops.yml"
+# Validador del manifiesto: el MISMO archivo que ejecuta el job `preparar` de
+# _reusable-security.yml. bootstrap-repo.sh lo copia desde
+# 02-pipelines/scripts/validar-manifiesto.py.
+readonly VALIDADOR_MANIFIESTO=".github/scripts/validar-manifiesto.py"
 readonly INFORMES_BASE_DEFECTO=".security-reports"
 # Versiones fijadas para --instalar (mismas que usa el pipeline; actualícelas
 # junto con _reusable-security.yml para conservar la paridad local/CI).
@@ -266,6 +276,44 @@ detectar_stack() {
 # job `preparar` de _reusable-security.yml: .trivyignore.yaml, .gitleaksignore
 # y las listas para checkov (--skip-check), semgrep (--exclude-rule) y
 # pip-audit (--ignore-vuln). Los archivos generados NO se versionan.
+# ------------------------------------------------------------------------------
+# validar_manifiesto: la MISMA comprobación que hace el job `preparar` de CI,
+# con el mismo archivo. Hasta el 2026-09-20 solo validaba CI: un manifiesto con
+# una fecha sin comillas o con un `componente` que no existe pasaba el análisis
+# local y fallaba recién en el pipeline, que es exactamente la divergencia que
+# este script existe para evitar. Un manifiesto inválido detiene el análisis
+# (código 3): las excepciones salen de él, así que seguir daría un informe con
+# excepciones mal aplicadas y apariencia de limpio.
+# ------------------------------------------------------------------------------
+validar_manifiesto() {
+  [[ -f "$MANIFIESTO" ]] || return 0
+  log_seccion "Validación de $MANIFIESTO"
+  if ! command -v python3 >/dev/null 2>&1; then
+    log_warn "python3 no disponible: no se valida el manifiesto (en CI sí se valida)"
+    return 0
+  fi
+  # En CI este mismo caso FALLA el job: allí el repositorio siempre pasó por
+  # bootstrap-repo.sh y el manifiesto se valida sí o sí. Aquí solo se avisa,
+  # porque este script corre también en repositorios a medio equipar.
+  if [[ ! -f "$VALIDADOR_MANIFIESTO" ]]; then
+    log_warn "Falta $VALIDADOR_MANIFIESTO: no se valida el manifiesto (en CI este caso falla el job)."
+    log_warn "  Ejecute bootstrap-repo.sh para copiarlo."
+    return 0
+  fi
+  local rc=0
+  python3 "$VALIDADOR_MANIFIESTO" --formato texto || rc=$?
+  case "$rc" in
+    0) return 0 ;;
+    # 2 = no se pudo validar (falta el esquema o jsonschema): el validador ya
+    # explicó qué falta. No bloquea, pero tampoco cuenta como validado.
+    2) log_warn "Manifiesto NO validado por falta de dependencias; en CI esta comprobación sí corre."
+       return 0 ;;
+    *) log_error "$MANIFIESTO no valida. El job \`preparar\` de CI falla con esto antes de ejecutar ningún escáner."
+       log_error "Corrija lo señalado arriba y vuelva a ejecutar; no se analiza nada con un manifiesto inválido."
+       exit 3 ;;
+  esac
+}
+
 # ------------------------------------------------------------------------------
 generar_excepciones() {
   log_seccion "Excepciones vigentes desde $MANIFIESTO"
@@ -1185,6 +1233,7 @@ main() {
   [[ "$INFORMES_BASE" == "$INFORMES_BASE_DEFECTO" ]] && asegurar_gitignore "${INFORMES_BASE_DEFECTO}/"
 
   detectar_stack
+  validar_manifiesto
   generar_excepciones
   correr_gitleaks
   correr_semgrep
