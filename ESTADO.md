@@ -1,6 +1,6 @@
 # Estado del repositorio frente al estándar DevSecOps
 
-Última actualización: 2026-10-01 (reusable 2.7 en `main`).
+Última actualización: 2026-10-01 (reusable 2.7 y acciones del #75 en `main`).
 
 ## Versión del estándar
 
@@ -29,13 +29,16 @@
 - **Primer run en `main` con el reusable 2.7.** Run 36828896081 sobre `6d82790`: success, 32 jobs en success de 43 (el resto omitidos); sin Environments. Code Scanning recibió las categorías `checkov-workflows-<componente>` con 0 resultados y no hubo alertas nuevas; las 18 abiertas son todas de Scorecard.
 - **Code Scanning y `nosemgrep`.** Con el reusable 2.3 o posterior, un `nosemgrep` filtra el hallazgo del SARIF en vez de reabrir la alerta. Las alertas #75, #76 y #77 (Semgrep, `infra-terraform`) pasaron a `fixed` el 2026-10-01 05:58 UTC, con el análisis de `28ecea7` en 0 resultados, y no a `dismissed`.
 - **Checkov sobre los workflows.** Hasta el reusable 2.6, el job `iac` analizaba solo el directorio de cada componente y nunca `.github/workflows/`; `CKV_GHA_7` solo aparecía en `./security-local.sh`. Desde el 2.7, el job `workflows` los analiza siempre. Medido con Checkov 3.3.13 (la versión que fija el job): analiza los 6 de 6 workflows, ninguno descartado en silencio, y marca `CKV_GHA_7` en `release.yml` (`tipo`, `prerelease`) y en `ci-multicloud.yml` (`tag`, `confirmar`). Está exceptuado en `.devsecops.yml` hasta el 2026-12-30 (90 días); la justificación cubre los dos archivos y se verificó contra su código: `confirmar` solo se compara con `DESPLEGAR` en condiciones `if:`, y `tag` llega a `ref:` de `actions/checkout` y a la variable `TAG`, que el shell usa entre comillas tras exigir tag existente, sin guion y ancestro de `main`.
+- **PR #81 (concurrency).** Fusionado el 2026-10-01 en `8abaf59`: el `group` de `ci-multicloud.yml` usa `github.run_id` y no `github.sha`, para que un tag y un `workflow_dispatch` sobre el mismo commit no se cancelen entre sí.
+- **Dependabot #75 (grupo `actions-minor-patch`, 8 acciones).** Revisado el diff completo: solo cambian pines por SHA en 5 workflows. Los 7 SHAs de tags se verificaron contra el repositorio de cada acción; el de `checkov-action` es un commit de `master` sin tag. Head `c75c080`, al día con `main` en `8abaf59`, 39 checks en success y 11 omitidos. Aprobado por el agente con AndresAlberdi por delegación y fusionado con segurolotengopy, por squash, el 2026-10-01 en `20d06d2`, con el OK de Andres en el chat.
 - **`./security-local.sh`:** CRITICAL=0, HIGH=0, APROBADO.
 
 ## Pendiente
 
 - **Excepción `CKV_GHA_7`:** revisar antes del 2026-12-30; si los inputs ya no hacen falta, quitarlos de `release.yml` y de `ci-multicloud.yml` y borrar la excepción.
 - **Categorías viejas de Code Scanning** (`semgrep`, `trivy-fs`, `trivy-config`, sin análisis desde el 2026-09-12): decisión de Andres, 2026-10-01, **dejarlas como están**. Eran 1.335 análisis con 755, 362 y 36 resultados. Se borraron 248 antes de que el clasificador del modo automático bloqueara un `DELETE`; quedan unos 1.077 con unos 988 resultados de historial, y GitHub podó unos 10 por su cuenta. No estorban: ninguna de las 34 alertas del repositorio, en ningún estado, tiene su instancia más reciente en esas categorías, y no reciben análisis nuevos. Borrar el resto es irreversible y no aporta nada funcional. Al borrar, GitHub exige `confirm_delete` para el último análisis de cada conjunto («puede perder datos históricos de alertas»).
-- **Dependabot #75** (10 acciones): rebasado por Dependabot el 2026-10-01 (head `5db55ac`, base `6d82790`), con el CI en verde (39 jobs en success). Falta el OK de Andres para fusionarlo.
+- **Primer run en `main` con las acciones del #75:** el run de CI/CD Multicloud sobre `20d06d2` no se había medido al escribir esto. Mirar `iac` y `workflows`: el pin de `checkov-action` trae Checkov 3.3.19 y este documento midió con la 3.3.13. Si pasa limpio, borrar este punto.
+- **Comentario del pin de `checkov-action`** en `_reusable-security.yml`: sigue diciendo «master @ 2026-08-26» y el pin vigente es de `master` del 2026-09-17 (commit `444c9db`). Dependabot no lo actualiza; corregirlo en la próxima actualización del estándar.
 - **`gitleaks.toml` 2.1** del estándar (allowlist de `.trivy-cache/`, `.security-reports/` y `.deploy-log/`): nuestra copia es idéntica a la versión anterior, sin cambios propios; se trae en la próxima actualización, por fusión de tres vías.
 
 ## Cómo se actualiza
