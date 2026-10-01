@@ -298,3 +298,10 @@ seguridad:
       aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-01"
+    - id: CKV_GHA_7
+      herramienta: checkov
+      justificacion: >-
+        Regla SLSA sobre .github/workflows/release.yml: exige que workflow_dispatch no declare inputs. Los dos que declara son de tipo cerrado, no texto libre: tipo es un choice de [auto, patch, minor, major] y prerelease un boolean, así que GitHub rechaza cualquier otro valor antes de que el workflow arranque. Además tipo llega al shell por variable de entorno (TIPO_ENTRADA), no interpolado en el script, que es la inyección que la regla busca evitar. Quitarlos obligaría a editar el workflow para cada release. Revisar al vencer; si los inputs ya no hacen falta, quitarlos y borrar esta excepción.
+      aprobado_por: AndresAlberdi
+      creado: "2026-10-01"
+      vence: "2026-12-30"

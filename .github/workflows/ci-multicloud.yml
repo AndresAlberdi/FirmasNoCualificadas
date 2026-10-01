@@ -61,8 +61,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Un PR cancela su corrida anterior (misma ref); cada push (main, tags) tiene su
+  # propio grupo y nunca se cancela. La condición va en `group` y NO en
+  # `cancel-in-progress`: Checkov descarta en silencio, sin error ni aviso, todo
+  # workflow cuyo `cancel-in-progress` sea una expresión (medido el 2026-10-01 con
+  # checkov 3.3.13), y el job `iac` pasaba en verde sin analizarlo.
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: true
 
 env:
   FIREBASE_TOOLS_VERSION: '15.28.1'
@@ -673,7 +678,7 @@ jobs:
       url_objetivo: ${{ matrix.objetivo.url }}
       reglas: ${{ needs.preparar.outputs.zap_reglas }}
       escaneo_completo: false
-      ruta_salud: ${{ vars.HEALTH_PATH || '/healthz' }}
+      ruta_salud: ${{ vars.HEALTH_PATH || '/health' }}
 
   # ---------------------------------------------------------------------------
   # Fase 6 — desplegar-produccion: misma estructura que staging con las
@@ -841,7 +846,7 @@ jobs:
           gcloud run services update-traffic "$SERVICIO" --region "$REGION" --project "$PROYECTO" --to-revisions="$nueva=10,$anterior=90"
           fallos=0
           for _ in $(seq 1 12); do
-            c=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "${URL%/}${HEALTH_PATH:-/healthz}" || echo 000)
+            c=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "${URL%/}${HEALTH_PATH:-/health}" || echo 000)
             [[ "$c" == "200" ]] || fallos=$((fallos+1)); sleep 10
           done
           if (( fallos > 2 )); then
@@ -949,12 +954,12 @@ jobs:
         id: salud
         env:
           URL: ${{ matrix.objetivo.url }}
-          RUTA_SALUD: ${{ vars.HEALTH_PATH || '/healthz' }}
+          RUTA_SALUD: ${{ vars.HEALTH_PATH || '/health' }}
         run: |
           set -uo pipefail
           for i in $(seq 1 10); do
             c=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 -L "${URL%/}${RUTA_SALUD}" || echo 000)
-            # Un frontend estático puede no exponer /healthz: si la ruta de
+            # Un frontend estático puede no exponer /health: si la ruta de
             # salud devuelve 404 se acepta / con 200.
             if [[ "$c" == "404" ]]; then
               c=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 -L "${URL%/}/" || echo 000)
