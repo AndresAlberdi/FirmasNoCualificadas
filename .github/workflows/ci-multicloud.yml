@@ -61,12 +61,18 @@ permissions:
   contents: read
 
 concurrency:
-  # Un PR cancela su corrida anterior (misma ref); cada push (main, tags) tiene su
-  # propio grupo y nunca se cancela. La condición va en `group` y NO en
+  # Un PR cancela su corrida anterior (misma ref); cualquier otra corrida (push a main,
+  # tag, workflow_dispatch) tiene su grupo único y nunca se cancela. Es `github.run_id`
+  # y NO `github.sha`: con sha, el push de un tag vX.Y.Z y un workflow_dispatch sobre
+  # ese mismo commit compartirían grupo y la segunda corrida cancelaría la corrida
+  # ENTERA de la primera, incluido un despliegue a producción en curso (la concurrency
+  # propia del job, deploy-production, no lo evita: protege al job de otros jobs, no de
+  # que cancelen su corrida). Lo señaló la sesión de novuchat-site el 2026-10-01.
+  # La condición va en `group` y NO en
   # `cancel-in-progress`: Checkov descarta en silencio, sin error ni aviso, todo
   # workflow cuyo `cancel-in-progress` sea una expresión (medido el 2026-10-01 con
   # checkov 3.3.13), y el job `iac` pasaba en verde sin analizarlo.
-  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
 
 env:
