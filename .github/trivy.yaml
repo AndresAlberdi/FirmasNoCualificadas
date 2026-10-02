@@ -89,18 +89,14 @@ pkg:
 
 misconfiguration:
   include-non-failures: false
-  # Revisa las políticas embebidas de Trivy (Docker CIS, Terraform, K8s).
-  #
-  # Solo nombres que Trivy acepta. La lista tenía `dockercompose` y
-  # `github-actions`, que no son escáneres de Trivy 0.70: ante un nombre inválido
-  # Trivy registra un ERROR y DESCARTA LA LISTA ENTERA en favor de la suya por
-  # defecto, de modo que esta sección no controlaba nada. Los workflows los
-  # revisa checkov (reglas CKV_GHA_*); Compose no se usa en este repositorio.
-  scanners:
-    - terraform
-    - dockerfile
-    - kubernetes
-    - helm
+  # Sin lista de escáneres: se usan los de Trivy por defecto (terraform,
+  # dockerfile, kubernetes, helm, cloudformation, azure-arm, ansible…).
+  # La 2.0 declaraba `dockercompose` y `github-actions`, que Trivy 0.70 no
+  # reconoce: registraba «Invalid misconfiguration scanners provided, using
+  # default scanners» y descartaba la lista entera. Quitar solo esas dos
+  # entradas habría ACHICADO la cobertura: la lista pasa a respetarse, y no
+  # incluía cloudformation ni azure-arm. Los workflows de GitHub Actions los
+  # revisa Checkov (reglas CKV_GHA_*).
 
 secret:
   # Gitleaks es el escáner principal de secretos; Trivy actúa como red de

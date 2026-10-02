@@ -298,3 +298,10 @@ seguridad:
       aprobado_por: AndresAlberdi
       creado: "2026-09-02"
       vence: "2026-12-01"
+    - id: CKV_GHA_7
+      herramienta: checkov
+      justificacion: >-
+        Regla SLSA sobre workflow_dispatch con inputs, en dos workflows de este repositorio (revisado el 2026-10-01: ningún input se interpola en un script). (1) release.yml declara `tipo`, un choice de [auto, patch, minor, major], y `prerelease`, un boolean: GitHub rechaza cualquier otro valor antes de que arranque, y `tipo` llega al shell por variable de entorno (TIPO_ENTRADA), no interpolado en el script. (2) ci-multicloud.yml declara `tag` y `confirmar`, de texto: `confirmar` solo se compara con la cadena DESPLEGAR en condiciones `if:` y su valor no llega a ningún script; `tag` llega a `ref:` de actions/checkout (también dentro del reusable de seguridad, vía env.REF) y a una variable de entorno (TAG) que el shell usa entre comillas, y antes de desplegar a producción se exige que sea un tag existente (refs/tags/), sin guion (lo que descarta los prerelease y cualquier valor que empiece por -) y ancestro de origin/main. Solo quien tiene permiso de escritura lanza un workflow_dispatch, y ese permiso ya permite ejecutar el workflow de su propia rama. Quitar los inputs obligaría a editar el workflow en cada release o despliegue manual. Revisar al vencer; si los inputs ya no hacen falta, quitarlos y borrar esta excepción.
+      aprobado_por: AndresAlberdi
+      creado: "2026-10-01"
+      vence: "2026-12-30"
