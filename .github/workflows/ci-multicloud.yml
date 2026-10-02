@@ -1,6 +1,6 @@
 # =============================================================================
 # ci-multicloud.yml — Pipeline dirigido por el manifiesto .devsecops.yml
-# Versión: 2.0 | Fecha: 2026-08-24
+# Versión: 2.6 | Fecha: 2026-10-01
 # -----------------------------------------------------------------------------
 # Para monorepos o proyectos con varios componentes en distintas nubes
 # (p. ej. web en Firebase + api en Cloud Run + infra en OCI). Lee el manifiesto
@@ -108,7 +108,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # En workflow_dispatch se analiza/despliega el tag aprobado (D3)
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - name: Generar y validar matrices desde el manifiesto
         id: m
@@ -214,7 +214,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # En workflow_dispatch se analiza/despliega el tag aprobado (D3)
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       # ---- node --------------------------------------------------------------
       - name: Node.js
@@ -335,7 +335,7 @@ jobs:
       stack: ${{ matrix.componente.stack }}
       bloquear_en: ${{ needs.preparar.outputs.bloquear_en }}
       subir_sarif: ${{ github.event.repository.visibility == 'public' || vars.GHAS_ENABLED == 'true' }}
-      ref: ${{ inputs.tag || '' }}
+      ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || '' }}
     # Se pasan solo los dos secretos que el reusable declara, en lugar de
     # `secrets: inherit`: heredar entrega TODOS los secretos del repositorio
     # —incluidas las credenciales de despliegue— a un workflow que solo necesita
@@ -370,7 +370,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # En workflow_dispatch se analiza/despliega el tag aprobado (D3)
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       # ---- firebase: build de la SPA ----------------------------------------
       - name: Node.js
@@ -522,7 +522,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # En workflow_dispatch se analiza/despliega el tag aprobado (D3)
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
       - name: Descargar build del componente
         if: matrix.componente.proveedor != 'oci'
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
@@ -728,7 +728,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # En workflow_dispatch se analiza/despliega el tag aprobado (D3)
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
           fetch-depth: 0 # historial y tags completos para verificar la aprobación
 
       # D3 — Verificación de aprobación previa a producción (todos los modos).
@@ -739,10 +739,26 @@ jobs:
           ACTOR: ${{ github.actor }}
           APROBADORES: ${{ vars.APROBADORES_PROD }}
           FIRMA_REQUERIDA: ${{ vars.TAG_FIRMADO_REQUERIDO }}
+          REF_EJECUCION: ${{ github.ref }}
         run: |
           set -euo pipefail
           git fetch --quiet origin main
           if [[ "$EVENTO" == "workflow_dispatch" ]]; then
+            # 0) El dispatch se lanza SOBRE el mismo tag estable que despliega. Control de coherencia del propio
+            #    workflow (NO es una barrera: quien edita el workflow en una rama puede quitarlo; la barrera de
+            #    identidad es la condición del provider de producción, setup-oidc-gcp.sh 2.3, PR-B, pendiente).
+            if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::El tag del dispatch debe tener la forma vX.Y.Z (versión estable; un prerelease no se despliega a producción)."
+              exit 1
+            fi
+            if [[ "$REF_EJECUCION" != "refs/tags/$TAG" ]]; then
+              wf="${GITHUB_WORKFLOW_REF%%@*}"; wf="${wf##*/}"
+              echo "::error::Lance el workflow_dispatch sobre el mismo tag que despliega: gh workflow run ${wf} --ref ${TAG} -f tag=${TAG} -f confirmar=DESPLEGAR (ref de esta ejecución: ${REF_EJECUCION})"
+              exit 1
+            fi
+            # 0b) El código descargado es el del tag aprobado, no el de una rama con el mismo nombre.
+            [[ "$(git rev-parse HEAD)" == "$(git rev-parse "refs/tags/$TAG^{commit}")" ]] \
+              || { echo "::error::El código del workspace no es el del tag $TAG (¿existe una rama con el mismo nombre?)"; exit 1; }
             git rev-parse -q --verify "refs/tags/$TAG" >/dev/null \
               || { echo "::error::El tag '$TAG' no existe en el repositorio"; exit 1; }
             [[ "$TAG" != *-* ]] \
