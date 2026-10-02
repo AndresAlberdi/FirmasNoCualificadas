@@ -1,6 +1,6 @@
 # =============================================================================
 # dependabot.yml — Actualización automática de dependencias y de pines por SHA
-# Versión: 2.2 | Revisado: 2026-09-12
+# Versión: 2.3 | Revisado: 2026-10-02
 # -----------------------------------------------------------------------------
 # CORREGIDO (2026-09-05). La versión anterior venía de la plantilla del estándar
 # y tenía dos problemas que se anulaban entre sí:
@@ -40,6 +40,14 @@
 # con notas de cambio. Las de github-actions, docker y terraform siguen
 # llegando en PR individuales. También se separan en npm los grupos de
 # producción y de desarrollo, y se agrupan los menores de terraform.
+#
+# PYTHON FIJO EN 3.12 (2026-10-02). La imagen base de `/services` no sube de
+# versión menor ni mayor de Python mientras el proyecto declare 3.12 (CLAUDE.md,
+# `PYTHON_VERSION` del CI, ruff y mypy): un contenedor que corre una versión
+# distinta de la que se prueba es un riesgo sin ninguna ventaja. El PR #24 (3.14)
+# se cerró por esto. Subir de versión es una decisión de producto con su propio
+# trabajo: declararla, probarla en el CI y, solo entonces, cambiar la imagen y
+# quitar el `ignore` de la entrada docker.
 #
 # OJO: la exclusión (`ignore`) también frena las actualizaciones de SEGURIDAD
 # que exijan una versión mayor. La alerta sigue apareciendo en Dependabot
@@ -171,6 +179,12 @@ updates:
     labels: [dependencias, docker, seguridad]
     commit-message:
       prefix: "chore(docker)"
+    # Python se queda en 3.12 (ver encabezado). La etiqueta de la imagen no lleva
+    # parche (`3.12-slim-bookworm`), así que cualquier avance que proponga
+    # Dependabot es una menor o una mayor.
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   # ---- Terraform — infraestructura --------------------------------------------
   - package-ecosystem: terraform
