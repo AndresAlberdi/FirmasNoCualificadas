@@ -1,0 +1,433 @@
+<title>Firma no cualificada interna</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --ground:   #F5F3F1;
+    --surface:  #FFFFFF;
+    --sunk:     #ECE8E5;
+    --ink:      #201C1B;
+    --muted:    #5E5754;
+    --faint:    #8A817D;
+    --rule:     #DED8D4;
+    --rule-firm:#C0B7B2;
+
+    --sello:      #7B2D3B;
+    --sello-soft: #F4E6E8;
+    --si:      #2C6B4F;
+    --si-soft: #E3EFE9;
+    --ojo:      #8A5A0B;
+    --ojo-soft: #F7EEDC;
+
+    --shadow: 0 1px 2px rgba(32,28,27,.05), 0 10px 26px -14px rgba(32,28,27,.18);
+
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #161413;
+      --surface:  #1D1A19;
+      --sunk:     #262221;
+      --ink:      #EAE5E2;
+      --muted:    #A29A96;
+      --faint:    #837A76;
+      --rule:     #322C2B;
+      --rule-firm:#443C3A;
+
+      --sello:      #D98795;
+      --sello-soft: #331A1F;
+      --si:      #63B78F;
+      --si-soft: #14291F;
+      --ojo:      #D2A458;
+      --ojo-soft: #2C2413;
+
+      --shadow: 0 1px 2px rgba(0,0,0,.45), 0 10px 26px -14px rgba(0,0,0,.7);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:   #161413;
+    --surface:  #1D1A19;
+    --sunk:     #262221;
+    --ink:      #EAE5E2;
+    --muted:    #A29A96;
+    --faint:    #837A76;
+    --rule:     #322C2B;
+    --rule-firm:#443C3A;
+
+    --sello:      #D98795;
+    --sello-soft: #331A1F;
+    --si:      #63B78F;
+    --si-soft: #14291F;
+    --ojo:      #D2A458;
+    --ojo-soft: #2C2413;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.45), 0 10px 26px -14px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 16.5px;
+    line-height: 1.66;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .hoja { max-width: 940px; margin: 0 auto; padding: 0 clamp(18px, 4vw, 44px) 88px; }
+  p { max-width: 68ch; }
+  :focus-visible { outline: 2px solid var(--sello); outline-offset: 3px; }
+
+  /* ------------------------------------------------------------ Portada -- */
+  .portada { padding: clamp(42px, 7vw, 78px) 0 30px; border-bottom: 2px solid var(--ink); }
+
+  .membrete {
+    font-family: var(--sans);
+    font-size: 10.5px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--faint); display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 20px;
+  }
+  .membrete span:not(:last-child)::after { content: " ·"; color: var(--rule-firm); }
+
+  h1 {
+    font-family: var(--serif); font-weight: 700;
+    font-size: clamp(1.9rem, 5vw, 2.9rem); line-height: 1.12; letter-spacing: -.018em;
+    text-wrap: balance; margin: 0 0 18px; max-width: 20ch;
+  }
+
+  .sumario { font-size: clamp(1.02rem, 1.9vw, 1.18rem); line-height: 1.58; color: var(--muted); max-width: 62ch; margin: 0; }
+
+  /* ------------------------------------------------------------ Núcleo --- */
+  .nucleo {
+    margin-top: 28px; padding: 22px 24px;
+    background: var(--surface); border: 1px solid var(--rule); border-left: 5px solid var(--sello);
+    border-radius: 3px; box-shadow: var(--shadow);
+  }
+  .nucleo h2 { margin: 0 0 10px; font-size: 1.12rem; line-height: 1.35; max-width: none; }
+  .nucleo p { margin: 0 0 11px; font-size: .97rem; }
+  .nucleo p:last-child { margin-bottom: 0; }
+
+  /* --------------------------------------------------------- Secciones --- */
+  section { padding-top: clamp(42px, 6vw, 66px); }
+
+  .rotulo {
+    font-family: var(--sans); font-size: 10.5px; font-weight: 700;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--faint); margin: 0 0 9px;
+  }
+
+  h2 {
+    font-family: var(--serif); font-weight: 600;
+    font-size: clamp(1.38rem, 3vw, 1.76rem); line-height: 1.24; letter-spacing: -.012em;
+    text-wrap: balance; margin: 0 0 14px; max-width: 28ch;
+  }
+
+  h3 { font-family: var(--sans); font-weight: 600; font-size: 1rem; line-height: 1.35; margin: 0 0 7px; }
+
+  .entrada { color: var(--muted); margin-bottom: 24px; }
+
+  .norma {
+    font-family: var(--mono); font-size: .8em; font-weight: 500;
+    color: var(--sello); background: var(--sello-soft);
+    padding: .14em .45em; border-radius: 2px; white-space: nowrap;
+  }
+
+  /* ------------------------------------------------------------ Tablas --- */
+  .marco { overflow-x: auto; border: 1px solid var(--rule); border-radius: 3px; background: var(--surface); box-shadow: var(--shadow); margin-bottom: 18px; }
+  table { width: 100%; border-collapse: collapse; font-family: var(--sans); font-size: .91rem; min-width: 560px; }
+  th, td { text-align: left; padding: 13px 17px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th {
+    font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--faint); background: var(--sunk); border-bottom: 1px solid var(--rule-firm); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+
+  .chip {
+    display: inline-block; font-family: var(--sans); font-size: 9.5px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase; padding: 4px 9px; border-radius: 2px; white-space: nowrap;
+  }
+  .chip.si  { color: var(--si);  background: var(--si-soft); }
+  .chip.no  { color: var(--sello); background: var(--sello-soft); }
+  .chip.ojo { color: var(--ojo); background: var(--ojo-soft); }
+
+  /* ------------------------------------------------------------ Citas ---- */
+  blockquote {
+    margin: 0 0 16px; padding: 3px 0 3px 19px; border-left: 3px solid var(--sello);
+    font-style: italic; font-size: 1.02rem; line-height: 1.52; max-width: 60ch;
+  }
+  blockquote cite {
+    display: block; margin-top: 8px; font-family: var(--sans); font-style: normal;
+    font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--faint);
+  }
+
+  /* ---------------------------------------------------------- Producto --- */
+  .produce { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+  .pieza {
+    background: var(--surface); border: 1px solid var(--rule); border-top: 3px solid var(--sello);
+    border-radius: 3px; padding: 18px 20px; box-shadow: var(--shadow);
+  }
+  .pieza p { margin: 0; font-family: var(--sans); font-size: .89rem; color: var(--muted); max-width: none; }
+
+  /* ------------------------------------------------------------ Cierre --- */
+  .cierre {
+    margin-top: clamp(48px, 7vw, 72px); padding-top: 24px; border-top: 2px solid var(--ink);
+    font-family: var(--sans); font-size: .85rem; color: var(--faint);
+  }
+  .cierre p { max-width: 78ch; margin: 0 0 9px; }
+  .cierre ul { margin: 8px 0 0; padding-left: 18px; }
+  .cierre li { margin-bottom: 4px; }
+</style>
+
+<div class="hoja">
+
+  <header class="portada">
+    <div class="membrete">
+      <span>Informe técnico</span>
+      <span>Para el equipo técnico de Alianza Garantía</span>
+      <span>3 de septiembre de 2026</span>
+    </div>
+    <h1>Firma no cualificada interna</h1>
+    <p class="sumario">
+      Base normativa del módulo de firma electrónica no cualificada que opera dentro de la
+      propia plataforma: qué habilita, qué acredita, qué límite tiene y bajo qué condiciones el
+      encuadre se sostiene.
+    </p>
+
+    <div class="nucleo">
+      <h2>En una línea</h2>
+      <p>
+        <strong>Firmar los propios contratos no es prestar un servicio de confianza</strong>, de
+        modo que el módulo no requiere registro ante el Ministerio de Industria y Comercio ni
+        habilitación previa de ningún tipo.
+      </p>
+      <p>
+        Lo que sí requiere es <strong>un expediente de evidencias capaz de sostener una
+        pericia</strong>, porque la firma no cualificada no goza de la equivalencia con la firma
+        manuscrita y, impugnada su autenticidad, hay que probarla.
+      </p>
+    </div>
+  </header>
+
+  <section>
+    <p class="rotulo">1 · Encuadre</p>
+    <h2>Por qué un módulo interno no se registra</h2>
+    <p class="entrada">
+      La distinción está en la definición legal, y es literal.
+    </p>
+
+    <blockquote>
+      Servicio de confianza: el servicio electrónico <strong>prestado habitualmente a cambio de
+      una remuneración</strong>, consistente en: a) la creación, verificación y validación de
+      firmas electrónicas, sellos electrónicos, sellos de tiempo electrónicos, servicios de
+      entrega electrónica certificada y certificados relativos a estos servicios […]
+      <cite>Ley N.º 6822/2021 · artículo 4.º, numeral 48</cite>
+    </blockquote>
+
+    <p>
+      Las dos condiciones son acumulativas: <em>habitualmente</em> y <em>a cambio de una
+      remuneración</em>. Un módulo que firma las contrataciones de la propia organización no
+      presta un servicio a nadie, y por lo tanto no encuadra en la definición.
+    </p>
+    <p>
+      Coherentemente, la obligación de comunicar la actividad está dirigida a los
+      <strong>prestadores</strong>:
+    </p>
+
+    <blockquote>
+      Los prestadores de servicios de confianza no cualificados no necesitan autorización
+      administrativa para iniciar su actividad, pero deben comunicar su actividad a la Autoridad
+      de Aplicación en el plazo de tres meses desde que la inicien.
+      <cite>Ley N.º 6822/2021 · artículo 15</cite>
+    </blockquote>
+
+    <p>
+      El Decreto N.º 7576/2022 reglamenta ese trámite <span class="norma">art. 5.º</span> y
+      publica el listado de prestadores. Nada de eso alcanza a un módulo interno.
+    </p>
+  </section>
+
+  <section>
+    <p class="rotulo">2 · Valor probatorio</p>
+    <h2>Qué acredita la firma, y qué no</h2>
+    <p class="entrada">
+      Este es el punto que conviene que el equipo técnico tenga claro antes de diseñar sobre el
+      módulo, porque determina qué hay que registrar y conservar.
+    </p>
+
+    <div class="marco">
+      <table>
+        <thead>
+          <tr><th scope="col">Propiedad</th><th scope="col">¿La tiene la firma no cualificada?</th><th scope="col">Norma</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Admisibilidad</strong> — no se le niegan efectos jurídicos ni admisibilidad en procedimientos privados, judiciales y administrativos por ser electrónica</td>
+            <td><span class="chip si">Sí</span></td>
+            <td><span class="norma">art. 39.1</span></td>
+          </tr>
+          <tr>
+            <td><strong>Admisibilidad como prueba documental</strong> del soporte con los datos firmados</td>
+            <td><span class="chip si">Sí</span></td>
+            <td><span class="norma">art. 63.2</span></td>
+          </tr>
+          <tr>
+            <td><strong>Equivalencia con la firma manuscrita</strong></td>
+            <td><span class="chip no">No</span> — la ley se la reconoce únicamente a la firma <em>cualificada</em></td>
+            <td><span class="norma">art. 39.2</span></td>
+          </tr>
+          <tr>
+            <td><strong>Acreditación automática de autenticidad e identidad del titular</strong></td>
+            <td><span class="chip no">No</span> — reservada a los instrumentos privados suscritos con firma cualificada</td>
+            <td><span class="norma">art. 63.1.b</span></td>
+          </tr>
+          <tr>
+            <td><strong>Fe respecto de la fecha</strong></td>
+            <td><span class="chip ojo">Solo con sello de tiempo</span> de un prestador cualificado — y esto vale <em>incluso</em> para la firma cualificada</td>
+            <td><span class="norma">art. 63.1.b</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      La consecuencia operativa está en el artículo 40: impugnada la autenticidad de la firma,
+      se está a lo establecido en el <strong>artículo 404 del Código Civil Paraguayo</strong>.
+      Dicho de otro modo: <strong>lo que sostiene la firma no es el certificado, es el
+      expediente</strong>. Por eso el módulo está construido alrededor del registro de
+      evidencias y no alrededor de la criptografía.
+    </p>
+  </section>
+
+  <section>
+    <p class="rotulo">3 · Qué entrega el módulo</p>
+    <h2>Piezas verificables por un tercero</h2>
+    <p class="entrada">
+      Descripción funcional. Cada pieza está pensada para que la verifique alguien que no confíe
+      en la organización que la emitió — que es la situación de una pericia.
+    </p>
+
+    <div class="produce">
+      <div class="pieza">
+        <h3>Acta de evidencias sellada</h3>
+        <p>
+          Registro cerrado del acto de firma —qué documento, con qué huella, en qué momento y
+          bajo qué política de identidad— protegido criptográficamente contra alteración
+          posterior, incluida la alteración por parte de quien lo emitió.
+        </p>
+      </div>
+      <div class="pieza">
+        <h3>Verificación pública</h3>
+        <p>
+          Un tercero comprueba el acta con claves publicadas, sin credenciales y sin intervención
+          de la organización. Un registro que solo su emisor puede validar no traslada confianza:
+          la concentra.
+        </p>
+      </div>
+      <div class="pieza">
+        <h3>Huella del documento</h3>
+        <p>
+          El documento se cierra y se hashea antes de habilitar la firma. Cualquier modificación
+          posterior es detectable por comparación, que es el requisito del artículo 64 sobre
+          conservación de la forma original.
+        </p>
+      </div>
+      <div class="pieza">
+        <h3>Pista de auditoría inalterable</h3>
+        <p>
+          Los registros no se sobrescriben ni se borran: una corrección escribe una versión
+          nueva y la anterior permanece. Un registro que su titular puede reescribir no prueba
+          nada.
+        </p>
+      </div>
+      <div class="pieza">
+        <h3>Firma incrustada en el PDF <span style="color:var(--ojo)">(opcional)</span></h3>
+        <p>
+          Modo avanzado: firma conforme a PAdES sobre el propio archivo, verificable con
+          cualquier validador estándar. Requiere sello de tiempo externo, y por eso es una
+          decisión aparte.
+        </p>
+      </div>
+      <div class="pieza">
+        <h3>Aislamiento de datos sensibles</h3>
+        <p>
+          Los datos biométricos, de identidad y de salud no viajan al acta ni a la constancia
+          pública: se referencian por huella. El acta puede entregarse a un tercero sin exponer
+          al firmante.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="rotulo">4 · Condiciones</p>
+    <h2>De qué depende que el encuadre se sostenga</h2>
+    <p class="entrada">
+      Dos condiciones, y ninguna es opcional.
+    </p>
+
+    <div class="marco">
+      <table>
+        <thead>
+          <tr><th scope="col">Condición</th><th scope="col">Por qué</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>El módulo opera dentro de la infraestructura de la organización</strong>, con sus propias claves</td>
+            <td>La definición del artículo 4.º num. 48 incluye expresamente <strong>«la creación […] de firmas electrónicas»</strong>. Si la firma se creara en infraestructura de un tercero a cambio de una tarifa, ese tercero estaría prestando un servicio de confianza — y entonces sí correspondería el registro. La frontera la marca dónde se crea la firma.</td>
+          </tr>
+          <tr>
+            <td><strong>El módulo firma contrataciones de la propia organización</strong></td>
+            <td>En el momento en que se firmara habitualmente para terceros a cambio de una remuneración, dejaría de ser un mecanismo interno.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <p class="rotulo">5 · La pieza que exige un tercero</p>
+    <h2>Fecha cierta</h2>
+    <p>
+      Es lo único del conjunto que no puede resolverse internamente. El artículo 63.1.b
+      condiciona la fe respecto de la fecha a un <strong>sello electrónico de tiempo otorgado
+      por un prestador cualificado de servicios de confianza</strong>, y lo hace incluso para la
+      firma cualificada.
+    </p>
+    <p>
+      Existen autoridades de sellado de tiempo públicas y gratuitas conformes al estándar
+      RFC 3161, y es técnicamente viable operar una propia. <strong>Ninguna de las dos opciones
+      da fecha cierta en Paraguay</strong>, porque la norma no pide un sello técnicamente
+      correcto sino uno emitido por un prestador cualificado. Sirven para desarrollo y pruebas.
+    </p>
+    <p>
+      Sin ese sello, la fecha del acto la afirma la propia organización — que es parte
+      interesada. Con él, la afirma un tercero habilitado. El módulo contempla las dos
+      situaciones y <strong>marca explícitamente cuál se aplicó</strong>, de modo que un
+      artefacto de prueba no pueda presentarse como uno con fecha oponible.
+    </p>
+  </section>
+
+  <footer class="cierre">
+    <p><strong>Normas citadas.</strong> Todas verificadas contra el texto oficial:</p>
+    <ul>
+      <li><strong>Ley N.º 6822/2021</strong>, «De los servicios de confianza para las transacciones electrónicas, del documento electrónico y los documentos transmisibles electrónicos» — arts. 4.º num. 48, 15, 39, 40, 63 y 64.</li>
+      <li><strong>Decreto N.º 7576/2022</strong>, reglamentario — arts. 5.º y 6.º.</li>
+    </ul>
+    <p style="margin-top:12px">
+      El artículo 40 remite al artículo 404 del Código Civil Paraguayo, cuyo texto no se
+      reproduce acá: determina qué debe probarse ante la impugnación y conviene revisarlo con
+      asesoría legal.
+    </p>
+    <p>
+      Este documento describe el encuadre normativo y las capacidades del módulo. No detalla su
+      arquitectura interna ni sus decisiones de diseño, y no constituye asesoramiento legal.
+    </p>
+  </footer>
+
+</div>
