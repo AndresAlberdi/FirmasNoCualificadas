@@ -457,7 +457,7 @@ jobs:
           format: table
       - name: SBOM
         if: steps.nombre.outputs.imagen != ''
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ${{ steps.nombre.outputs.imagen }}
           format: spdx-json
@@ -618,7 +618,7 @@ jobs:
       - name: Renderizar task definition
         if: matrix.componente.proveedor == 'ecs'
         id: render
-        uses: aws-actions/amazon-ecs-render-task-definition@138c24f321fdbdf7edee4a685519d253cae2cdea # v1
+        uses: aws-actions/amazon-ecs-render-task-definition@8d79160660ad39c402a16e5fc7cd2a32e8f7d6b7 # v1
         with:
           task-definition: ${{ matrix.componente.ruta }}/.aws/task-definition.json
           container-name: ${{ env.SERVICIO }}
@@ -903,7 +903,7 @@ jobs:
       - name: Renderizar task definition
         if: matrix.componente.proveedor == 'ecs'
         id: render
-        uses: aws-actions/amazon-ecs-render-task-definition@138c24f321fdbdf7edee4a685519d253cae2cdea # v1
+        uses: aws-actions/amazon-ecs-render-task-definition@8d79160660ad39c402a16e5fc7cd2a32e8f7d6b7 # v1
         with:
           task-definition: ${{ matrix.componente.ruta }}/.aws/task-definition.json
           container-name: ${{ env.SERVICIO }}
