@@ -219,7 +219,7 @@ jobs:
       # ---- node --------------------------------------------------------------
       - name: Node.js
         if: matrix.componente.stack == 'node'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: ${{ vars.NODE_VERSION || '22' }}
       - name: Lint + pruebas (node)
@@ -252,7 +252,7 @@ jobs:
           python-version: ${{ vars.PYTHON_VERSION || '3.12' }}
       - name: uv
         if: matrix.componente.stack == 'python'
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
           cache-dependency-glob: ${{ matrix.componente.ruta }}/uv.lock
@@ -375,7 +375,7 @@ jobs:
       # ---- firebase: build de la SPA ----------------------------------------
       - name: Node.js
         if: matrix.componente.proveedor == 'firebase'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: ${{ vars.NODE_VERSION || '22' }}
           cache: npm
@@ -457,7 +457,7 @@ jobs:
           format: table
       - name: SBOM
         if: steps.nombre.outputs.imagen != ''
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ${{ steps.nombre.outputs.imagen }}
           format: spdx-json
@@ -481,7 +481,7 @@ jobs:
 
       - name: Publicar artifact del componente
         if: env.PUBLICAR == 'true' || matrix.componente.proveedor == 'firebase'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: build-${{ matrix.componente.nombre }}
           path: salida/
@@ -525,7 +525,7 @@ jobs:
           ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
       - name: Descargar build del componente
         if: matrix.componente.proveedor != 'oci'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: build-${{ matrix.componente.nombre }}
           path: salida
@@ -618,7 +618,7 @@ jobs:
       - name: Renderizar task definition
         if: matrix.componente.proveedor == 'ecs'
         id: render
-        uses: aws-actions/amazon-ecs-render-task-definition@138c24f321fdbdf7edee4a685519d253cae2cdea # v1
+        uses: aws-actions/amazon-ecs-render-task-definition@8d79160660ad39c402a16e5fc7cd2a32e8f7d6b7 # v1
         with:
           task-definition: ${{ matrix.componente.ruta }}/.aws/task-definition.json
           container-name: ${{ env.SERVICIO }}
@@ -627,7 +627,7 @@ jobs:
             APP_ENV=staging
       - name: ECS
         if: matrix.componente.proveedor == 'ecs'
-        uses: aws-actions/amazon-ecs-deploy-task-definition@c465972ecbd160473f22e683363b422a5412a3de # v2
+        uses: aws-actions/amazon-ecs-deploy-task-definition@a00d4d57ac0de1a99b39fe469f3d898d38717c2b # v2
         with:
           task-definition: ${{ steps.render.outputs.task-definition }}
           service: ${{ env.SERVICIO }}
@@ -782,7 +782,7 @@ jobs:
 
       - name: Descargar build del componente
         if: matrix.componente.proveedor != 'oci'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: build-${{ matrix.componente.nombre }}
           path: salida
@@ -903,7 +903,7 @@ jobs:
       - name: Renderizar task definition
         if: matrix.componente.proveedor == 'ecs'
         id: render
-        uses: aws-actions/amazon-ecs-render-task-definition@138c24f321fdbdf7edee4a685519d253cae2cdea # v1
+        uses: aws-actions/amazon-ecs-render-task-definition@8d79160660ad39c402a16e5fc7cd2a32e8f7d6b7 # v1
         with:
           task-definition: ${{ matrix.componente.ruta }}/.aws/task-definition.json
           container-name: ${{ env.SERVICIO }}
@@ -912,7 +912,7 @@ jobs:
             APP_ENV=production
       - name: ECS (con circuit breaker configurado en el servicio)
         if: matrix.componente.proveedor == 'ecs'
-        uses: aws-actions/amazon-ecs-deploy-task-definition@c465972ecbd160473f22e683363b422a5412a3de # v2
+        uses: aws-actions/amazon-ecs-deploy-task-definition@a00d4d57ac0de1a99b39fe469f3d898d38717c2b # v2
         with:
           task-definition: ${{ steps.render.outputs.task-definition }}
           service: ${{ env.SERVICIO }}
